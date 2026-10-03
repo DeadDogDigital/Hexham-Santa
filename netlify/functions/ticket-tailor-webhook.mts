@@ -16,15 +16,15 @@ function validSignature(raw,header,secret){
 }
 
 async function db(path,options={}){
-  const url=Netlify.env.get("SUPABASE_URL");
+  const url="https://atqhqizzfnsokulmupmy.supabase.co";
   const key=Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if(!url||!key)throw new Error("Santa Supabase server configuration is incomplete.");
+  if(!key)throw new Error("Santa Supabase server configuration is incomplete.");
   const res=await fetch(url+"/rest/v1/"+path,{
     ...options,
     headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json",Prefer:"return=representation",...(options.headers||{})}
   });
-  const text=await res.text();
-  let data;try{data=JSON.parse(text)}catch{data=text}
+  const responseText=await res.text();
+  let data;try{data=JSON.parse(responseText)}catch{data=responseText}
   if(!res.ok)throw new Error(typeof data==="string"?data:(data.message||data.hint||"Supabase request failed"));
   return data;
 }
