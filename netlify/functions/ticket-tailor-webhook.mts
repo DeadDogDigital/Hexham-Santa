@@ -31,10 +31,9 @@ async function db(path,options={}){
 
 const text=v=>v==null?null:String(v).trim()||null;
 
-function questions(order){
+function questions(items=[]){
   const all=[];
-  if(order.buyer_details?.custom_questions)all.push(...order.buyer_details.custom_questions);
-  for(const t of order.issued_tickets||[]) if(t.custom_questions) all.push(...t.custom_questions);
+  for(const q of items||[]) all.push(q);
   return Object.fromEntries(all.map(q=>[(q.question||"").trim().toLowerCase(),q.answer??""]));
 }
 
@@ -96,15 +95,18 @@ export default async (req)=>{
     }
 
     if(hook.event==="ORDER.CREATED"&&!existing.length){
-      const qs=questions(order);
-      const children=(order.issued_tickets||[]).map(t=>({
-        booking_id:bookingId,
-        ticket_tailor_ticket_id:t.id||null,
-        preferred_name:text(t.first_name||t.name||answer(qs,["child's preferred name","child preferred name","child first name"])),
-        age:Number.isFinite(Number(answer(qs,["child age","age"])))?Number(answer(qs,["child age","age"])):null,
-        interests:answer(qs,["things they love","child interests","interests"]),
-        santa_notes:answer(qs,["anything santa should mention","anything santa should know","santa notes"])
-      })).filter(c=>c.preferred_name);
+      const children=(order.issued_tickets||[]).map(t=>{
+        const qs=questions(t.custom_questions||[]);
+        const ageAnswer=answer(qs,["child's age","child age","age"]);
+        return {
+          booking_id:bookingId,
+          ticket_tailor_ticket_id:t.id||null,
+          preferred_name:text(t.first_name||t.name||answer(qs,["child's preferred name","child preferred name","child first name"])),
+          age:Number.isFinite(Number(ageAnswer))?Number(ageAnswer):null,
+          interests:answer(qs,["things they love","child interests","interests"]),
+          santa_notes:answer(qs,["anything santa should mention","anything santa should know","santa notes"])
+        };
+      }).filter(c=>c.preferred_name);
       if(children.length)await db("santa_children",{method:"POST",body:JSON.stringify(children)});
     }
   }
