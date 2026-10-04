@@ -100,7 +100,7 @@ export default async (req)=>{
       const children=(order.issued_tickets||[]).map(t=>({
         booking_id:bookingId,
         ticket_tailor_ticket_id:t.id||null,
-        preferred_name:text(t.first_name||t.name||answer(qs,["child preferred name","child first name"])),
+        preferred_name:text(t.first_name||t.name||answer(qs,["child's preferred name","child preferred name","child first name"])),
         age:Number.isFinite(Number(answer(qs,["child age","age"])))?Number(answer(qs,["child age","age"])):null,
         interests:answer(qs,["things they love","child interests","interests"]),
         santa_notes:answer(qs,["anything santa should mention","anything santa should know","santa notes"])
