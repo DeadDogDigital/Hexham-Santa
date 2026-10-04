@@ -195,8 +195,8 @@
 <div class="snow-container" id="snow"></div>
 
 <div class="interest-bar">
-  <span>✦ Santa Priority List booking is now open</span>
-  <a href="#register">Book Your Visit</a>
+  <span>✦ Tickets opening soon — be first to know</span>
+  <a href="#register">Register Your Interest</a>
 </div>
 
 <header class="hero">
@@ -212,7 +212,7 @@
     <div class="hero-divider"></div>
     <p class="hero-tagline">Step into a Dickensian world of lantern light and Christmas wonder — where every child meets Father Christmas in a moment they will carry forever.</p>
     <p class="hero-dates">25th November — 24th December 2026</p>
-    <div class="hero-cta"><a href="#register" class="btn-primary">Book Your Visit</a></div>
+    <div class="hero-cta"><a href="#register" class="btn-primary">Register Your Interest</a></div>
     <div class="countdown-wrap">
       <div class="countdown-label">Opening night in</div>
       <div class="countdown" id="countdown">
@@ -243,7 +243,7 @@
       <div class="announce-pill">✦ Perfect for ages 2–10</div>
       <div class="announce-pill">✦ 28 nights of magic</div>
     </div>
-    <p style="font-family:'IM Fell English',serif;font-style:italic;font-size:1rem;color:rgba(245,234,214,0.5);">Priority booking is now open to families on the Santa Priority List.<br>General booking will follow.</p>
+    <p style="font-family:'IM Fell English',serif;font-style:italic;font-size:1rem;color:rgba(245,234,214,0.5);">Tickets and full pricing will be announced very soon.<br>Register below to be first in line.</p>
   </div>
 </section>
 
@@ -361,15 +361,29 @@
 
 <section class="interest-section" id="register">
   <div class="section-inner">
-    <span class="section-label">Book Your Visit</span>
-    <h2 class="section-title">Choose Your<br><em>Christmas Moment</em></h2>
+    <span class="section-label">Be First to Know</span>
+    <h2 class="section-title">Register Your<br><em>Interest</em></h2>
     <div class="ornamental-rule"><span>✦</span></div>
-    <p class="booking-intro">Choose your date and time below. Tickets are released in stages so that we can keep the experience calm, personal and manageable for every family.</p>
-    <div class="booking-widget-wrap">
-      <!-- Ticket Tailor Widget. Paste this into your website where you want the widget to appear. Do not change the code or the widget may not work properly. -->
-      <div class="tt-widget"><div class="tt-widget-fallback"><p><a href="https://www.tickettailor.com/all-tickets-calendar/hexhamchristmasexperience/?ref=website_widget" target="_blank">Click here to buy tickets</a><br /><small><a href="https://www.tickettailor.com?rf=wdg_331225" class="tt-widget-powered">Sell tickets online with Ticket Tailor</a></small></p></div><script src="https://cdn.tickettailor.com/js/widgets/min/widget.js" data-url="https://www.tickettailor.com/all-tickets-calendar/hexhamchristmasexperience/?ref=website_widget" data-type="inline" data-inline-minimal="true" data-inline-show-logo="false" data-inline-bg-fill="true" data-inline-inherit-ref-from-url-param="" data-inline-ref="website_widget"></script></div>
-      <!-- End of Ticket Tailor Widget -->
+    <p class="interest-intro">Tickets for the Hexham Santa Experience 2026 will be released very soon. Register below and you will be the first to hear when booking opens — giving you the best chance of securing your preferred date before the crowds.</p>
+    <div class="interest-form-wrap">
+      <form id="formContent" name="santa-interest" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" action="/thank-you">
+        <input type="hidden" name="form-name" value="santa-interest" />
+        <input type="hidden" name="bot-field" style="display:none" />
+        <h3>Reserve Your Place in the Queue</h3>
+        <p class="form-sub">We will notify you the moment tickets go live.</p>
+        <div class="form-field"><label>Your Name</label><input type="text" id="f-name" name="name" placeholder="e.g. Sarah Wilson" required /></div>
+        <div class="form-field"><label>Email Address</label><input type="email" id="f-email" name="email" placeholder="your@email.com" required /></div>
+        <div class="form-field"><label>Number of Children</label>
+          <select id="f-children" name="children"><option value="">Select…</option><option>1</option><option>2</option><option>3</option><option>4+</option></select>
+        </div>
+        <div class="form-field"><label>Preferred Visit Time</label>
+          <select id="f-time" name="preferred-time"><option value="">No preference</option><option>Weekday daytime</option><option>Weekday after school (4–6:30pm)</option><option>Weekend</option><option>Evening premium slot</option><option>Christmas Eve</option></select>
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top:24px;border:none;cursor:pointer;">Notify Me When Tickets Open</button>
+        <p class="form-note">No spam. No sharing. Just one email when tickets go live.</p>
+      </form>
     </div>
+    <div class="From community daytime visits to intimate Christmas Eve sessions - tickets announced very soon</div>
   </div>
 </section>
 
@@ -453,7 +467,7 @@
   <div class="footer-title">Hexham Santa Experience</div>
   <div class="footer-theme-line">A Christmas Carol · Hexham Old Gaol · 2026</div>
   <div class="footer-links">
-    <a href="#register">Book Your Visit</a>
+    <a href="#register">Register Interest</a>
     <a href="mailto:HexhamChristmas@gmail.com">Contact Us</a>
     <a href="#">Sponsorship</a>
     <a href="#">Accessibility</a>
