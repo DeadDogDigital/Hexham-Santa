@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update Your Santa Visit</title>
+<style>
+:root{--ink:#1a1208;--parchment:#f5ead6;--cream:#fdf6e8;--burgundy:#7a1f2e;--gold:#c49a2a;--gold-light:#e8be50;--midnight:#0f1f1a}
+*{box-sizing:border-box}body{margin:0;background:var(--midnight);color:var(--parchment);font:18px/1.6 Georgia,serif}.wrap{max-width:720px;margin:auto;padding:28px 18px 60px}.card{background:var(--cream);color:var(--ink);border-radius:14px;padding:25px;margin-bottom:18px}h1,h2{font-family:Georgia,serif;line-height:1.2}h1{font-size:clamp(2rem,8vw,3rem);margin:.2rem 0 1rem}h2{font-size:1.5rem;margin-top:0}.intro{color:rgba(245,234,214,.8);margin-bottom:24px}.eyebrow{color:var(--gold-light);letter-spacing:.14em;text-transform:uppercase;font-size:.8rem}.muted{opacity:.7}.notice{padding:13px;border-radius:9px;background:#eee3cc;margin-top:14px}.error{background:#ead6d6;color:#7a1f2e}.success{background:#dcebdc;color:#24552b}.child{border-top:1px solid #ddd0b7;padding:18px 0}.child:first-child{border-top:0;padding-top:0}.child h3{margin:0 0 3px;font-size:1.15rem}.child-age{font-size:.9rem;opacity:.65;margin-bottom:12px}label{display:block;font-weight:bold;margin:12px 0 5px}input,textarea{width:100%;border:1px solid #d7c7a7;border-radius:8px;padding:11px;font:inherit;color:var(--ink);background:#fffaf0}textarea{min-height:90px;resize:vertical}button{border:0;border-radius:999px;padding:12px 20px;background:var(--burgundy);color:#fff;font-weight:bold;font-size:1rem;cursor:pointer;margin-top:16px}.secondary{background:#e8d5b0;color:var(--ink)}.hidden{display:none!important}.lock{border-left:4px solid var(--gold);padding-left:14px}
+</style></head><body><main class="wrap">
+<div class="intro"><div class="eyebrow">Hexham Santa Experience</div><h1>Update Your Santa Visit</h1><p>Want to give Santa a little more to work with? You can update what your child loves and anything you'd like Santa to mention.</p><p class="muted">Updates close <strong>36 hours before your visit</strong> so our Santa team has time to prepare.</p></div>
+<section id="lookup-card" class="card"><h2>Find your booking</h2><p class="muted">Use the email address you booked with and your Ticket Tailor order number. You'll find the order number on your confirmation email.</p><label for="email">Booking email</label><input id="email" type="email" autocomplete="email" required><label for="reference">Ticket Tailor order number</label><input id="reference" type="text" inputmode="numeric" autocomplete="off" required><button id="find">Find my booking</button><div id="lookup-msg" class="notice hidden"></div></section>
+<section id="edit-card" class="card hidden"><h2>Your Santa visit</h2><div id="visit-summary" class="muted"></div><div id="children"></div><button id="save">Save updates</button><div id="save-msg" class="notice hidden"></div></section>
+<section id="locked-card" class="card hidden"><h2>Your information is now locked</h2><p class="lock">Your visit is within 36 hours, so we've closed updates while our Santa team prepares your visit.</p><p id="locked-summary" class="muted"></p><button id="back" class="secondary">Back</button></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+let booking=null;
+function msg(el,text,kind=""){el.textContent=text;el.className="notice "+kind}
+function format(value){return new Date(value).toLocaleString("en-GB",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}
+async function call(payload){
+ const res=await fetch("/api/santa-update",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+ const data=await res.json().catch(()=>({error:"Something went wrong."}));
+ if(!res.ok)throw new Error(data.error||"Something went wrong.");
+ return data;
+}
+$("#find").onclick=async()=>{
+ const email=$("#email").value.trim(),reference=$("#reference").value.trim();
+ if(!email||!reference)return msg($("#lookup-msg"),"Please enter both your booking email and order number.","error");
+ $("#find").disabled=true;$("#find").textContent="Checking…";
+ try{
+   const data=await call({action:"lookup",email,reference});
+   booking={email,reference,...data.booking};
+   if(data.locked){
+     $("#lookup-card").classList.add("hidden");$("#locked-card").classList.remove("hidden");
+     $("#locked-summary").textContent="Your visit is "+format(data.booking.visit_starts_at)+". No further changes can be made online.";
+     return;
+   }
+   $("#lookup-card").classList.add("hidden");$("#edit-card").classList.remove("hidden");
+   $("#visit-summary").textContent="Visit: "+format(data.booking.visit_starts_at);
+   $("#children").innerHTML=data.booking.children.map(c=>'<div class="child" data-id="'+esc(c.id)+'"><h3>'+esc(c.preferred_name)+'</h3><div class="child-age">Age '+esc(c.age??"not provided")+'</div><label>Things they love</label><textarea class="interests" maxlength="1000">'+esc(c.interests||"")+'</textarea><label>Anything Santa should mention</label><textarea class="notes" maxlength="1000">'+esc(c.santa_notes||"")+'</textarea></div>').join("");
+ }catch(e){msg($("#lookup-msg"),e.message,"error")}
+ finally{$("#find").disabled=false;$("#find").textContent="Find my booking"}
+};
+$("#save").onclick=async()=>{
+ $("#save").disabled=true;$("#save").textContent="Saving…";
+ try{
+   const updates=Array.from(document.querySelectorAll(".child")).map(el=>({id:el.dataset.id,interests:el.querySelector(".interests").value.trim(),santa_notes:el.querySelector(".notes").value.trim()}));
+   await call({action:"update",email:booking.email,reference:booking.reference,updates});
+   msg($("#save-msg"),"Your Santa information has been updated. We'll use the latest details when preparing for your visit.","success");
+ }catch(e){msg($("#save-msg"),e.message,"error")}
+ finally{$("#save").disabled=false;$("#save").textContent="Save updates"}
+};
+$("#back").onclick=()=>location.reload();
+</script></body></html>
