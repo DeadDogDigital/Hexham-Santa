@@ -79,9 +79,9 @@ function render(){
   if(filterMode==="date"&&filterDate) title="Selected date · "+shortDate(filterDate+"T12:00:00");
   $("#selection-title").textContent=" · "+title;
   $("#bookings").innerHTML=bookings.map(bookingCard).join("")||"<p>No bookings match this view.</p>";
-  $(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
-  $("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
-  $("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
+  $$(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
+  $$("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
+  $$("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
   document.title="Hexham Santa — "+title;
 }
 async function load(){
