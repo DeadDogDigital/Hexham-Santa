@@ -29,7 +29,7 @@ async function db(path,options={}){
   return data;
 }
 
-async function attachTreatsBooklet(bookingId){
+async function attachTreatsBooklet(bookingId, familySurname){
   const secret=Netlify.env.get("SANTA_TREATS_PROVISION_SECRET");
   // Keep normal Santa booking processing healthy until the Treats-side secret is configured.
   if(!secret)return;
@@ -37,7 +37,7 @@ async function attachTreatsBooklet(bookingId){
   const response=await fetch(endpoint,{
     method:"POST",
     headers:{"content-type":"application/json","x-santa-provision-secret":secret},
-    body:JSON.stringify({booking_ref:bookingId})
+    body:JSON.stringify({booking_ref:bookingId,family_surname:familySurname||""})
   });
   const text=await response.text();
   let result;try{result=JSON.parse(text)}catch{result={}};
@@ -114,7 +114,7 @@ export default async (req)=>{
     }
 
     if((order.status||"").toLowerCase()!=="cancelled"){
-      await attachTreatsBooklet(bookingId);
+      await attachTreatsBooklet(bookingId, booking.parent_last_name);
     }
 
     if(hook.event==="ORDER.CREATED"&&!existing.length){
