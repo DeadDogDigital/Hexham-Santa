@@ -32,7 +32,31 @@ function bookingCard(b){
   const statusLabel=status==="cancelled"?"CANCELLED":"CONFIRMED";
   const statusClass=status==="cancelled"?"cancelled":"confirmed";
   const childHtml=children.length?children.map(c=>'<div class="child"><div class="child-head"><strong>🎅 '+esc(c.preferred_name||"Unnamed child")+'</strong>'+(c.age!=null?'<span>Age '+esc(c.age)+'</span>':"")+'</div><div class="child-detail"><strong>❤️ Loves:</strong> '+esc(c.interests||"Not provided")+'</div><div class="child-detail"><strong>💬 Santa should mention:</strong> '+esc(c.santa_notes||"Nothing noted")+'</div></div>').join(""):'<p class="muted">No child details recorded.</p>';
-  return '<article class="booking '+statusClass+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div><div class="children">'+childHtml+'</div></article>';
+  const token=String(b.treat_booklet_id||"").trim();
+  const url=token?"https://giftlocal.netlify.app/treats/"+encodeURIComponent(token):"";
+  const treatsHtml=token
+    ?'<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3><p>Personal family booklet is linked and ready.</p><button type="button" data-show-qr="'+esc(b.id)+'">SHOW FAMILY QR</button><p class="muted">Display this QR at departure so the family can open their personal treats booklet.</p></div>'
+    :'<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3><p>No personal booklet is linked to this booking yet.</p></div>';
+  return '<article class="booking '+statusClass+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div><button type="button" class="booking-toggle" aria-expanded="false" data-toggle-booking="'+esc(b.id)+'">View booking details ＋</button><div class="booking-details hidden" id="details-'+esc(b.id)+'"><h3>Visit details</h3><p><strong>Visit time:</strong> '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Parent:</strong> '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+'</p><p><strong>Email:</strong> '+esc(b.parent_email||"Not provided")+'</p><p><strong>Phone:</strong> '+esc(b.parent_phone||"Not provided")+'</p><h3>Children and Santa notes</h3><div class="children">'+childHtml+'</div>'+treatsHtml+'</div></article>';
+}
+function showFamilyQr(bookingId){
+  const b=allBookings.find(item=>item.id===bookingId);
+  const token=String(b?.treat_booklet_id||"").trim();
+  if(!token){alert("There isn't a Treats booklet linked to this booking yet.");return;}
+  const url="https://giftlocal.netlify.app/treats/"+encodeURIComponent(token);
+  if(typeof qrcode!=="function"){alert("The QR-code library did not load. Please refresh and try again.");return;}
+  const qr=qrcode(0,"M");
+  qr.addData(url);
+  qr.make();
+  const overlay=document.createElement("div");
+  overlay.className="qr-overlay";
+  overlay.setAttribute("role","dialog");
+  overlay.setAttribute("aria-modal","true");
+  overlay.innerHTML='<div class="qr-panel"><p class="muted">HEXHAM SANTA • DEPARTURE</p><h2>🎁 Your Santa’s Local Treats</h2><p>Scan this code to open your family’s personal booklet.</p><img alt="Family Treats booklet QR code" src="'+qr.createDataURL(8,4)+'"><p class="qr-url">'+esc(url)+'</p><button type="button" id="close-family-qr">Close</button></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector("#close-family-qr").onclick=()=>overlay.remove();
+  overlay.addEventListener("click",event=>{if(event.target===overlay)overlay.remove()});
+  document.addEventListener("keydown",function closeOnEscape(event){if(event.key==="Escape"){overlay.remove();document.removeEventListener("keydown",closeOnEscape)}});
 }
 function nextSessionStart(){
   const now=Date.now();
@@ -55,7 +79,9 @@ function render(){
   if(filterMode==="date"&&filterDate) title="Selected date · "+shortDate(filterDate+"T12:00:00");
   $("#selection-title").textContent=" · "+title;
   $("#bookings").innerHTML=bookings.map(bookingCard).join("")||"<p>No bookings match this view.</p>";
-  $$(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
+  $(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
+  $("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
+  $("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
   document.title="Hexham Santa — "+title;
 }
 async function load(){
