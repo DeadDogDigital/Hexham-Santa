@@ -29,6 +29,25 @@ async function db(path,options={}){
   return data;
 }
 
+async function attachTreatsBooklet(bookingId){
+  const secret=Netlify.env.get("SANTA_TREATS_PROVISION_SECRET");
+  // Keep normal Santa booking processing healthy until the Treats-side secret is configured.
+  if(!secret)return;
+  const endpoint=Netlify.env.get("TREATs_PROVISION_URL")||"https://giftlocal.netlify.app/api/provision-treats-booklet";
+  const response=await fetch(endpoint,{
+    method:"POST",
+    headers:{"content-type":"application/json","x-santa-provision-secret":secret},
+    body:JSON.stringify({booking_ref:bookingId})
+  });
+  const text=await response.text();
+  let result;try{result=JSON.parse(text)}catch{result={}};
+  if(!response.ok||!result.access_token)throw new Error("Treats booklet provisioning failed");
+  await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{
+    method:"PATCH",
+    body:JSON.stringify({treat_booklet_id:result.access_token,updated_at:new Date().toISOString()})
+  });
+}
+
 const text=v=>v==null?null:String(v).trim()||null;
 
 function questions(items=[]){
@@ -92,6 +111,10 @@ export default async (req)=>{
       await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify(booking)});
     }else{
       bookingId=(await db("santa_bookings",{method:"POST",body:JSON.stringify(booking)}))[0].id;
+    }
+
+    if((order.status||"").toLowerCase()!=="cancelled"){
+      await attachTreatsBooklet(bookingId);
     }
 
     if(hook.event==="ORDER.CREATED"&&!existing.length){
