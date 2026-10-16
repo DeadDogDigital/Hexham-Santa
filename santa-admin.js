@@ -117,9 +117,10 @@ async function updateBookingField(id,field,value){
   render();
 }
 async function selectAllGroupBookings(){
+  if(filterMode==="all"||filterMode==="next"){alert("Choose a specific date using Today, Tomorrow or Choose date before selecting all group bookings. This prevents accidentally selecting bookings from multiple days.");return}
   const visible=currentVisibleBookings();
   const candidates=visible.filter(b=>isGroupBooking(b)&&!isCancelled(b));
-  if(!candidates.length){alert("There are no group bookings in this view. Choose a date or booking view first.");return}
+  if(!candidates.length){alert("There are no group bookings on this date.");return}
   const ids=candidates.map(b=>b.id);
   const {error}=await sb.from("santa_bookings").update({group_print_selected:true}).in("id",ids);
   if(error){alert("Couldn't select group bookings: "+error.message);return}
@@ -185,7 +186,7 @@ async function load(){
    for(const child of (booking.santa_children||[])){
      child.photo_url=null;
      if(child.photo_path){
-       const {data:signed}=await sb.storage.from("santa-child-photos").createSignedUrl(child.photo_path,3600);
+       const {data:signed}=await sb.storage.from("santa-child-photos").createSignedUrl(child.photo_path,604800);
        if(signed?.signedUrl)child.photo_url=signed.signedUrl;
      }
    }
