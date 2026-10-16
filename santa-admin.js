@@ -140,14 +140,23 @@ function printSelectedGroup(){
   if(!selected.length){alert("Select one or more group bookings first.");return}
   const children=selected.flatMap(b=>(b.santa_children||[]).map(c=>({booking:b,child:c})));
   const childHtml=children.map(({booking:b,child:c})=>{
-    const photo=c.photo_url?'<img src="'+esc(c.photo_url)+'" alt="Photo of '+esc(c.preferred_name||"child")+'">':'<div class="print-photo-empty">No photo</div>';
-    return '<div class="print-child">'+photo+'<div><h3>'+esc(c.preferred_name||"Unnamed child")+(c.age!=null?' · Age '+esc(c.age):"")+'</h3><div class="print-meta">Family: '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+' · Booking '+esc(formatDateTime(b.visit_starts_at))+'</div><div class="print-notes"><strong>Loves:</strong> '+esc(c.interests||"Not provided")+'</div><div class="print-notes"><strong>Santa should mention:</strong> '+esc(c.santa_notes||"Nothing noted")+'</div></div></div>';
+    const photo=c.photo_url?'<img src="'+esc(c.photo_url)+'" alt="Photo of '+esc(c.preferred_name||"child")+'">':'<div class="photo-empty">No photo</div>';
+    return '<article class="child">'+photo+'<div><h3>'+esc(c.preferred_name||"Unnamed child")+(c.age!=null?' · Age '+esc(c.age):"")+'</h3><p class="meta">Family: '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+' · Booking '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Loves:</strong> '+esc(c.interests||"Not provided")+'</p><p><strong>Santa should mention:</strong> '+esc(c.santa_notes||"Nothing noted")+'</p></div></article>';
   }).join("");
-  $("#group-print-sheet").innerHTML='<p style="letter-spacing:.12em;font-size:9pt">HEXHAM SANTA EXPERIENCE · PRIVATE STAFF BRIEFING</p><h1>Group Visit Briefing</h1><p>'+esc(selected.length)+' bookings · '+esc(children.length)+' children · Prepared '+esc(new Date().toLocaleString("en-GB"))+'</p><hr><h2>Children meeting Santa</h2>'+childHtml+'<hr><p class="print-meta">Confidential operational information. Please keep this sheet with authorised event staff and dispose of it securely after use.</p>';
-  $("#group-print-sheet").setAttribute("aria-hidden","false");
-  document.body.classList.add("printing-group");
-  window.print();
-  setTimeout(()=>{document.body.classList.remove("printing-group");$("#group-print-sheet").setAttribute("aria-hidden","true")},500);
+  const html='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hexham Santa — Group Visit Briefing</title><style>'+
+    'body{font:11pt/1.4 Arial,sans-serif;color:#111;background:#fff;margin:24px}h1{font: bold 24pt Georgia,serif;margin:0 0 8px}h2{font-size:15pt;margin:22px 0 8px}.eyebrow{font-size:9pt;letter-spacing:.12em}.meta{font-size:9.5pt;color:#444;margin:4px 0}.summary{color:#333}.child{display:grid;grid-template-columns:84px 1fr;gap:14px;padding:14px 0;border-top:1px solid #bbb;break-inside:avoid;page-break-inside:avoid}.child img,.photo-empty{width:84px;height:84px;object-fit:cover;border-radius:5px}.photo-empty{display:flex;align-items:center;justify-content:center;background:#eee;color:#555;font-size:9pt}.child h3{font-size:13pt;margin:0 0 3px}.child p{margin:5px 0}.confidential{font-size:9pt;color:#444;border-top:1px solid #bbb;padding-top:10px;margin-top:22px}.actions{position:sticky;top:0;background:#fdf6e8;padding:10px;margin:-24px -24px 24px;display:flex;gap:10px;border-bottom:1px solid #d7c7a7}.actions button{border:0;border-radius:999px;padding:10px 16px;background:#7a1f2e;color:#fff;font-weight:bold;font-size:11pt;cursor:pointer}.actions .secondary{background:#e8d5b0;color:#1a1208}@media print{body{margin:0}.actions{display:none!important}.child{break-inside:avoid;page-break-inside:avoid}}@page{margin:14mm}'+
+    '</style></head><body><div class="actions"><button onclick="window.print()">Print briefing</button><button class="secondary" onclick="window.close()">Close preview</button></div><p class="eyebrow">HEXHAM SANTA EXPERIENCE · PRIVATE STAFF BRIEFING</p><h1>Group Visit Briefing</h1><p class="summary">'+esc(selected.length)+' bookings · '+esc(children.length)+' children · Prepared '+esc(new Date().toLocaleString("en-GB"))+'</p><hr><h2>Children meeting Santa</h2>'+childHtml+'<p class="confidential">Confidential operational information. Please keep this sheet with authorised event staff and dispose of it securely after use.</p></body></html>';
+  const preview=window.open("","_blank");
+  if(!preview){alert("Your browser blocked the print preview window. Please allow pop-ups for this admin page and try again.");return}
+  preview.document.open();
+  preview.document.write(html);
+  preview.document.close();
+  const startPrint=()=>{
+    const images=Array.from(preview.document.images);
+    Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve}))).then(()=>setTimeout(()=>{try{preview.focus();preview.print()}catch(e){console.error("Could not open native print preview",e)}},250));
+  };
+  if(preview.document.readyState==="complete")startPrint();
+  else preview.addEventListener("load",startPrint,{once:true});
 }
 async function uploadChildPhoto(childId,file){
   if(!["image/jpeg","image/png","image/webp"].includes(file.type)){alert("Please choose a JPG, PNG or WebP image.");return}
