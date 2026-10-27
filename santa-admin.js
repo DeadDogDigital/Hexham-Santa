@@ -65,8 +65,27 @@ function showFamilyQr(bookingId){
   overlay.className="qr-overlay";
   overlay.setAttribute("role","dialog");
   overlay.setAttribute("aria-modal","true");
-  overlay.innerHTML='<div class="qr-panel"><p class="muted">HEXHAM SANTA • DEPARTURE</p><h2>🎁 Your Santa’s Local Treats</h2><p>Scan this code to open your family’s personal booklet.</p><img alt="Family Treats booklet QR code" src="'+qr.createDataURL(8,4)+'"><p class="qr-url">'+esc(url)+'</p><button type="button" id="close-family-qr">Close</button></div>';
+  overlay.innerHTML='<div class="qr-panel"><p class="muted">HEXHAM SANTA • DEPARTURE</p><h2>🎁 Your Santa’s Local Treats</h2><p>Scan this code to open your family’s personal booklet.</p><img alt="Family Treats booklet QR code" src="'+qr.createDataURL(8,4)+'"><p class="qr-url" id="family-booklet-url">' +esc(url)+'</p><button type="button" id="copy-family-link">Copy booklet link</button><p id="copy-family-link-status" class="muted" aria-live="polite"></p><button type="button" id="close-family-qr" class="secondary">Close</button></div>';
   document.body.appendChild(overlay);
+  overlay.querySelector("#copy-family-link").onclick=async()=>{
+    const button=overlay.querySelector("#copy-family-link");
+    const status=overlay.querySelector("#copy-family-link-status");
+    try{
+      if(navigator.clipboard&&typeof navigator.clipboard.writeText==="function"){
+        await navigator.clipboard.writeText(url);
+      }else{
+        const field=document.createElement("textarea");
+        field.value=url;field.setAttribute("readonly","");
+        field.style.position="fixed";field.style.opacity="0";field.style.pointerEvents="none";
+        document.body.appendChild(field);field.focus();field.select();
+        const copied=document.execCommand("copy");field.remove();
+        if(!copied)throw new Error("Copy was not available");
+      }
+      button.textContent="Copied!";status.textContent="Booklet link copied. Paste it directly into your message."; 
+    }catch(error){
+      status.textContent="Copy wasn’t available. Please use the QR code, or copy the link text above."; 
+    }
+  };
   overlay.querySelector("#close-family-qr").onclick=()=>overlay.remove();
   overlay.addEventListener("click",event=>{if(event.target===overlay)overlay.remove()});
   document.addEventListener("keydown",function closeOnEscape(event){if(event.key==="Escape"){overlay.remove();document.removeEventListener("keydown",closeOnEscape)}});
