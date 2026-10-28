@@ -52,6 +52,31 @@ function bookingCard(b){
   const groupControls=isGroupBooking(b)&&!isCancelled(b)?'<div class="booking-actions print-hide"><label class="group-select"><input type="checkbox" data-group-select="'+esc(b.id)+'" '+(selected?"checked":"")+'> Include in group print list</label><label class="checkin-control"><input type="checkbox" data-checkin="'+esc(b.id)+'" '+(checkedIn?"checked":"")+'> Checked in</label>'+(checkedIn?'<span class="checkin-label">✓ Arrived</span>':"")+'</div>':"";
   return '<article class="booking '+statusClass+(selected?' group-selected':'')+'" data-booking-card="'+esc(b.id)+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+(isGroupBooking(b)?' <span class="muted" style="font-size:.8em">· GROUP</span>':' <span class="muted" style="font-size:.8em">· PRIVATE</span>')+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div>'+groupControls+'<button type="button" class="booking-toggle" aria-expanded="false" data-toggle-booking="'+esc(b.id)+'">View booking details ＋</button><div class="booking-details hidden" id="details-'+esc(b.id)+'"><h3>Visit details</h3><p><strong>Visit time:</strong> '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Visit type:</strong> '+(isGroupBooking(b)?"Group visit":"Private visit")+'</p><p><strong>Parent:</strong> '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+'</p><p><strong>Email:</strong> '+esc(b.parent_email||"Not provided")+'</p><p><strong>Phone:</strong> '+esc(b.parent_phone||"Not provided")+'</p><h3>Children and Santa notes</h3><div class="children">'+childHtml+'</div>'+treatsHtml+'</div></article>';
 }
+async function linkTreatsBooklet(bookingId){
+  const booking=allBookings.find(b=>b.id===bookingId);
+  if(!booking)return alert("Booking not found. Refresh and try again.");
+  if(String(booking.treat_booklet_id||"").trim())return alert("This booking already has a Treats booklet linked. Nothing has been changed.");
+  const input=$("#treats-token-"+bookingId);
+  const entered=String(input?.value||"").trim();
+  if(!entered)return alert("Paste the family's Treats link or booklet token first.");
+  let token=entered;
+  if(/^https?:\/\//i.test(entered)){
+    try{
+      const url=new URL(entered);
+      if(url.hostname!=="giftlocal.netlify.app")return alert("Please use a link from giftlocal.netlify.app.");
+      const match=url.pathname.match(/^\/treats\/([^/]+)\/?$/i);
+      if(!match)return alert("That doesn't look like a Treats booklet link. Paste the full booklet link or just its token.");
+      token=decodeURIComponent(match[1]);
+    }catch{return alert("That link doesn't look valid. Please check it and try again.");}
+  }
+  if(!/^[A-Za-z0-9_-]{8,200}$/.test(token))return alert("The booklet token doesn't look valid. Paste the full Treats link or its token.");
+  const family=((booking.parent_first_name||"")+" "+(booking.parent_last_name||"")).trim()||"this family";
+  if(!confirm("Link this Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"?\n\nMake sure you copied the link from the correct family booklet."))return;
+  const {error}=await sb.from("santa_bookings").update({treat_booklet_id:token,updated_at:new Date().toISOString()}).eq("id",bookingId).is("treat_booklet_id",null);
+  if(error){alert("Couldn't link the Treats booklet: "+error.message);return load();}
+  alert("Treats booklet linked to this booking. The family QR is now available in the booking details.");
+  await load();
+}
 function showFamilyQr(bookingId){
   const b=allBookings.find(item=>item.id===bookingId);
   const token=String(b?.treat_booklet_id||"").trim();
@@ -118,7 +143,8 @@ function render(){
   $("#bookings").innerHTML=bookings.map(bookingCard).join("")||"<p>No bookings match this view.</p>";
   $$(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
   $$("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
-  $$("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
+  $("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
+  $("[data-link-treats]").forEach(btn=>btn.onclick=()=>linkTreatsBooklet(btn.dataset.linkTreats));
   $$("[data-group-select]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.groupSelect,"group_print_selected",input.checked));
   $$("[data-checkin]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.checkin,"checked_in_at",input.checked?new Date().toISOString():null));
   $$("[data-upload-photo]").forEach(btn=>btn.onclick=()=>{const input=$('[data-photo-input="'+btn.dataset.uploadPhoto+'"]');if(input)input.click()});
