@@ -46,9 +46,9 @@ function bookingCard(b){
   }).join(""):'<p class="muted">No child details recorded.</p>';
   const token=String(b.treat_booklet_id||"").trim();
   const url=token?"https://giftlocal.netlify.app/treats/"+encodeURIComponent(token):"";
-  const treatsHtml=token
-    ?'<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3><p>Personal family booklet is linked and ready.</p><button type="button" data-show-qr="'+esc(b.id)+'">SHOW FAMILY QR</button><p class="muted">Display this QR at departure so the family can open their personal treats booklet.</p></div>'
-    :'<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3><p>No personal booklet is linked to this booking yet.</p></div>';
+  const extras=b.extra_treats_booklets||[];
+  const extraHtml=extras.map((x,i)=>'<div class="extra-treat-row"><strong>Additional booklet '+(i+1)+(x.label?' · '+esc(x.label):'')+'</strong><p><button type="button" data-show-extra-qr="'+esc(b.id)+'" data-extra-token="'+esc(x.treat_booklet_id)+'">SHOW ADDITIONAL QR</button> <a href="https://giftlocal.netlify.app/treats/'+encodeURIComponent(x.treat_booklet_id)+'" target="_blank" rel="noopener">Open booklet</a></p></div>').join('');
+  const treatsHtml='<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3>'+(token?'<p>Original booking booklet is linked and unchanged.</p><button type="button" data-show-qr="'+esc(b.id)+'">SHOW ORIGINAL FAMILY QR</button>':'<p>No original booklet is linked to this booking.</p>')+'<p class="muted">Every booking keeps its original booklet. Additional booklets are listed separately below.</p>'+extraHtml+'<div class="extra-booklet-add"><label for="extra-treats-token-'+esc(b.id)+'">Add an additional booklet link</label><input id="extra-treats-token-'+esc(b.id)+'" type="url" placeholder="Paste GiftLocal booklet link"><input id="extra-treats-label-'+esc(b.id)+'" type="text" placeholder="Optional label (e.g. Family 2)"><button type="button" data-add-extra-treats="'+esc(b.id)+'">ADD ADDITIONAL BOOKLET</button></div></div>';
   const groupControls=isGroupBooking(b)&&!isCancelled(b)?'<div class="booking-actions print-hide"><label class="group-select"><input type="checkbox" data-group-select="'+esc(b.id)+'" '+(selected?"checked":"")+'> Include in group print list</label><label class="checkin-control"><input type="checkbox" data-checkin="'+esc(b.id)+'" '+(checkedIn?"checked":"")+'> Checked in</label>'+(checkedIn?'<span class="checkin-label">✓ Arrived</span>':"")+'</div>':"";
   return '<article class="booking '+statusClass+(selected?' group-selected':'')+'" data-booking-card="'+esc(b.id)+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+(isGroupBooking(b)?' <span class="muted" style="font-size:.8em">· GROUP</span>':' <span class="muted" style="font-size:.8em">· PRIVATE</span>')+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div>'+groupControls+'<button type="button" class="booking-toggle" aria-expanded="false" data-toggle-booking="'+esc(b.id)+'">View booking details ＋</button><div class="booking-details hidden" id="details-'+esc(b.id)+'"><h3>Visit details</h3><p><strong>Visit time:</strong> '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Visit type:</strong> '+(isGroupBooking(b)?"Group visit":"Private visit")+'</p><p><strong>Parent:</strong> '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+'</p><p><strong>Email:</strong> '+esc(b.parent_email||"Not provided")+'</p><p><strong>Phone:</strong> '+esc(b.parent_phone||"Not provided")+'</p><h3>Children and Santa notes</h3><div class="children">'+childHtml+'</div>'+treatsHtml+'</div></article>';
 }
@@ -77,9 +77,38 @@ async function linkTreatsBooklet(bookingId){
   alert("Treats booklet linked to this booking. The family QR is now available in the booking details.");
   await load();
 }
-function showFamilyQr(bookingId){
+
+async function addExtraTreatsBooklet(bookingId){
+  const booking=allBookings.find(b=>b.id===bookingId);
+  if(!booking)return alert("Booking not found. Refresh and try again.");
+  const input=$("#extra-treats-token-"+bookingId);
+  const labelInput=$("#extra-treats-label-"+bookingId);
+  const entered=String(input?.value||"").trim();
+  if(!entered)return alert("Paste the additional GiftLocal booklet link first.");
+  let token=entered;
+  if(/^https?:\/\//i.test(entered)){
+    try{
+      const url=new URL(entered);
+      if(url.hostname!=="giftlocal.netlify.app")return alert("Please use a link from giftlocal.netlify.app.");
+      const match=url.pathname.match(/^\/treats\/([^/]+)\/?$/i);
+      if(!match)return alert("That doesn't look like a Treats booklet link. Paste the full booklet link or just its token.");
+      token=decodeURIComponent(match[1]);
+    }catch{return alert("That link doesn't look valid. Please check it and try again.");}
+  }
+  if(!/^[A-Za-z0-9_-]{8,200}$/.test(token))return alert("The booklet token doesn't look valid. Paste the full Treats link or its token.");
+  if(token===String(booking.treat_booklet_id||"").trim())return alert("That's the original booking booklet. Paste the separate additional booklet link.");
+  if((booking.extra_treats_booklets||[]).some(x=>x.treat_booklet_id===token))return alert("That additional booklet is already attached to this booking.");
+  const label=String(labelInput?.value||"").trim().slice(0,80)||null;
+  const family=((booking.parent_first_name||"")+" "+(booking.parent_last_name||"")).trim()||"this booking";
+  if(!confirm("Add this extra Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"? The original booklet will remain unchanged."))return;
+  const {error}=await sb.from("santa_booking_extra_treats_booklets").insert({booking_id:bookingId,treat_booklet_id:token,label});
+  if(error){alert("Couldn't add the additional booklet: "+error.message);return load();}
+  alert("Additional Treats booklet added. The original booklet has not been changed.");
+  await load();
+}
+function showFamilyQr(bookingId,overrideToken=null,qrLabel="Original family booklet"){
   const b=allBookings.find(item=>item.id===bookingId);
-  const token=String(b?.treat_booklet_id||"").trim();
+  const token=String(overrideToken||b?.treat_booklet_id||"").trim();
   if(!token){alert("There isn't a Treats booklet linked to this booking yet.");return;}
   const url="https://giftlocal.netlify.app/treats/"+encodeURIComponent(token);
   if(typeof qrcode!=="function"){alert("The QR-code library did not load. Please refresh and try again.");return;}
@@ -143,7 +172,9 @@ function render(){
   $("#bookings").innerHTML=bookings.map(bookingCard).join("")||"<p>No bookings match this view.</p>";
   $$(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
   $$("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
-  $$("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
+  $("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr,null,"Original family booklet"));
+  $("[data-show-extra-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showExtraQr,btn.dataset.extraToken,"Additional Treats booklet"));
+  $("[data-add-extra-treats]").forEach(btn=>btn.onclick=()=>addExtraTreatsBooklet(btn.dataset.addExtraTreats));
   $$("[data-link-treats]").forEach(btn=>btn.onclick=()=>linkTreatsBooklet(btn.dataset.linkTreats));
   $$("[data-group-select]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.groupSelect,"group_print_selected",input.checked));
   $$("[data-checkin]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.checkin,"checked_in_at",input.checked?new Date().toISOString():null));
@@ -236,6 +267,11 @@ async function load(){
  const {data,error}=await sb.from("santa_bookings").select("*,santa_children(*)").order("visit_starts_at");
  if(error){$("#bookings").innerHTML="<p>"+esc(error.message)+"</p>";return}
  allBookings=data||[];
+ const {data:extraBooklets,error:extraError}=await sb.from("santa_booking_extra_treats_booklets").select("*");
+ if(extraError)console.error("Could not load additional Treats booklets",extraError.message);
+ const extrasByBooking=new Map();
+ for(const item of (extraBooklets||[])){const list=extrasByBooking.get(item.booking_id)||[];list.push(item);extrasByBooking.set(item.booking_id,list);}
+ for(const booking of allBookings)booking.extra_treats_booklets=extrasByBooking.get(booking.id)||[];
  for(const booking of allBookings){
    for(const child of (booking.santa_children||[])){
      child.photo_url=null;
