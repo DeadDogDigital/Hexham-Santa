@@ -143,8 +143,8 @@ function render(){
   $("#bookings").innerHTML=bookings.map(bookingCard).join("")||"<p>No bookings match this view.</p>";
   $$(".filter-buttons button").forEach(btn=>btn.classList.toggle("active",btn.dataset.filter===filterMode));
   $$("[data-toggle-booking]").forEach(btn=>btn.onclick=()=>{const panel=$("#details-"+btn.dataset.toggleBooking);const opening=panel.classList.contains("hidden");panel.classList.toggle("hidden",!opening);btn.setAttribute("aria-expanded",String(opening));btn.textContent=opening?"Hide booking details −":"View booking details ＋"});
-  $("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
-  $("[data-link-treats]").forEach(btn=>btn.onclick=()=>linkTreatsBooklet(btn.dataset.linkTreats));
+  $$("[data-show-qr]").forEach(btn=>btn.onclick=()=>showFamilyQr(btn.dataset.showQr));
+  $$("[data-link-treats]").forEach(btn=>btn.onclick=()=>linkTreatsBooklet(btn.dataset.linkTreats));
   $$("[data-group-select]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.groupSelect,"group_print_selected",input.checked));
   $$("[data-checkin]").forEach(input=>input.onchange=()=>updateBookingField(input.dataset.checkin,"checked_in_at",input.checked?new Date().toISOString():null));
   $$("[data-upload-photo]").forEach(btn=>btn.onclick=()=>{const input=$('[data-photo-input="'+btn.dataset.uploadPhoto+'"]');if(input)input.click()});
