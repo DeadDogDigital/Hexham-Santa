@@ -11,8 +11,13 @@ async function approvalRequest(method="POST",body=null){
  return data;
 }
 async function loadSavedApprovals(){
- const {data,error}=await sb.functions.invoke("email-approvals",{method:"GET"});
- if(error)throw error;
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session?.access_token)throw new Error("Please sign in again.");
+ const response=await fetch("https://zyxpfnxkpakrtcddnwph.supabase.co/functions/v1/email-approvals?lead_days="+encodeURIComponent($("#lead-days").value),{
+  method:"GET",headers:{Authorization:"Bearer "+session.access_token,apikey:"sb_publishable_va01K3WDNzrBgtt3c-LyCA_aoIZc3o-"}
+ });
+ const data=await response.json();
+ if(!response.ok)throw new Error(data?.error||"Could not load saved approvals.");
  approvedIds.clear();
  Object.entries(data?.approvals||{}).forEach(([id,row])=>{if(row.approved)approvedIds.add(id)});
 }
