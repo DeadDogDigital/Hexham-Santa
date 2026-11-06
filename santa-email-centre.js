@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 let bookings=[],selectedId=null,visible=[];const approvedIds=new Set();let approvalBusy=false;
 async function approvalRequest(method="POST",body=null){
- const options={method,headers:{"x-lead-days":String(Number($("#lead-days")?.value||5))}};
+ const options={method,headers:{}};
  if(body){options.body=body;}
  const {data,error}=await sb.functions.invoke("email-approvals",options);
  if(error)throw error;
