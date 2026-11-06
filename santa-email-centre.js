@@ -1,5 +1,7 @@
 const sb=window.supabase.createClient("https://zyxpfnxkpakrtcddnwph.supabase.co","sb_publishable_va01K3WDNzrBgtt3c-LyCA_aoIZc3o-");
 const $=s=>document.querySelector(s);
+const savedLeadDays=localStorage.getItem("hexhamSantaEmailLeadDays");
+if(["3","5","7","10"].includes(savedLeadDays)&&$("#lead-days"))$("#lead-days").value=savedLeadDays;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 let bookings=[],selectedId=null,visible=[];const approvedIds=new Set();let approvalBusy=false;
 async function approvalRequest(method="POST",body=null){
@@ -62,6 +64,7 @@ async function load(){const {data:{user},error:userError}=await sb.auth.getUser(
 $("#login-button").onclick=async()=>{const {error}=await sb.auth.signInWithPassword({email:$("#login-email").value.trim(),password:$("#login-password").value});if(error)$("#login-message").textContent=error.message;else{ $("#login-panel").classList.add("hidden");await load() }};
 $("#signout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 $("#search").oninput=renderList;$("#status-filter").onchange=renderList;$("#lead-days").onchange=async()=>{
+ localStorage.setItem("hexhamSantaEmailLeadDays",$("#lead-days").value);
  approvedIds.clear();renderList();renderApproval();
  try{await loadSavedApprovals();renderList();renderApproval();if(selectedId)selectBooking(selectedId)}
  catch(e){alert("Could not load saved approvals for this lead time. Please refresh and try again.");console.error(e)}
