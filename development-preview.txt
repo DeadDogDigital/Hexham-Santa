@@ -1,0 +1,2 @@
+Development preview marker for the Hexham Christmas email centre.
+This file is intentionally harmless and only exists on the hexham-christmas-development branch.
