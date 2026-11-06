@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 let bookings=[],selectedId=null,visible=[];const approvedIds=new Set();let approvalBusy=false;
 async function approvalRequest(method="POST",body=null){
- const options={method,headers:{}};
+ const options={method,headers:{"x-lead-days":String(Number($("#lead-days")?.value||5))}};
  if(body){options.body=body;}
  const {data,error}=await sb.functions.invoke("email-approvals",options);
  if(error)throw error;
@@ -56,6 +56,10 @@ function finalBatchCheck(){const approved=bookings.filter(b=>approvedIds.has(b.i
 async function load(){const {data:{user},error:userError}=await sb.auth.getUser();if(userError)console.warn(userError);if(!user){$("#login-panel").classList.remove("hidden");return}const {data:allowed,error:authError}=await sb.rpc("is_santa_admin");if(authError||!allowed){$("#login-panel").classList.remove("hidden");$("#login-message").textContent=authError?.message||"This account is not authorised as a Santa administrator.";return}$("#app").classList.remove("hidden");$("#signout").classList.remove("hidden");const {data,error}=await sb.from("santa_bookings").select("id,status,parent_first_name,parent_last_name,parent_email,visit_starts_at,santa_children(id,preferred_name,age)").order("visit_starts_at");if(error){$("#recipient-list").innerHTML='<div class="empty">Could not load bookings: '+esc(error.message)+'</div>';return}bookings=data||[];try{await loadSavedApprovals()}catch(e){console.error(e);$("#recipient-list").innerHTML="<div class=empty>Could not load saved approvals. Please refresh and try again.</div>";return}counts();renderList();renderApproval();const first=bookings.find(b=>emailState(b).ready)||bookings[0];if(first)selectBooking(first.id)}
 $("#login-button").onclick=async()=>{const {error}=await sb.auth.signInWithPassword({email:$("#login-email").value.trim(),password:$("#login-password").value});if(error)$("#login-message").textContent=error.message;else{ $("#login-panel").classList.add("hidden");await load() }};
 $("#signout").onclick=async()=>{await sb.auth.signOut();location.reload()};
-$("#search").oninput=renderList;$("#status-filter").onchange=renderList;$("#lead-days").onchange=()=>{renderList();renderApproval()};$("#final-check").onclick=finalBatchCheck;
+$("#search").oninput=renderList;$("#status-filter").onchange=renderList;$("#lead-days").onchange=async()=>{
+ approvedIds.clear();renderList();renderApproval();
+ try{await loadSavedApprovals();renderList();renderApproval();if(selectedId)selectBooking(selectedId)}
+ catch(e){alert("Could not load saved approvals for this lead time. Please refresh and try again.");console.error(e)}
+};$("#final-check").onclick=finalBatchCheck;
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.onclick=()=>{document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));$("#recipients-tab").classList.toggle("hidden",btn.dataset.tab!=="recipients");$("#preview-tab").classList.toggle("hidden",btn.dataset.tab!=="preview");$("#approval-tab").classList.toggle("hidden",btn.dataset.tab!=="approval");if(btn.dataset.tab==="approval")renderApproval()});
 load();
