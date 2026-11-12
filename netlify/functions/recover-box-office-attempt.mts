@@ -59,8 +59,12 @@ export default async req=>{
      payment_status:"paid",box_office_reference:id,provisioning_status:"tickets_issued",ticket_tailor_issued_ticket_ids:issued.map(t=>t.id)
     })}))[0];bookingId=row.id;
    }
-   const childRows=await db("santa_children?select=id&booking_id=eq."+encodeURIComponent(bookingId));
-   if(!childRows.length)await db("santa_children",{method:"POST",body:JSON.stringify(p.children.map((c,i)=>({booking_id:bookingId,ticket_tailor_ticket_id:issued[i].id,preferred_name:c.preferred_name,age:c.age,interests:c.interests||null,santa_notes:c.santa_notes||null})))});
+   // Reconcile child rows individually. A previous attempt may have saved only part of the family.
+   const childRows=await db("santa_children?select=id,ticket_tailor_ticket_id&booking_id=eq."+encodeURIComponent(bookingId));
+   const savedTicketIds=new Set(childRows.map(row=>row.ticket_tailor_ticket_id).filter(Boolean));
+   const missingChildren=p.children.map((child,i)=>({child,ticket:issued[i]})).filter(({ticket})=>!savedTicketIds.has(ticket.id));
+   if(missingChildren.length)await db("santa_children",{method:"POST",body:JSON.stringify(missingChildren.map(({child,ticket})=>({booking_id:bookingId,ticket_tailor_ticket_id:ticket.id,preferred_name:child.preferred_name,age:child.age,interests:child.interests||null,santa_notes:child.santa_notes||null})))});
+   await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({ticket_tailor_issued_ticket_ids:issued.map(t=>t.id),provisioning_status:"booklet_pending",provisioning_error:null,updated_at:new Date().toISOString()})});
    await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({booking_id:bookingId,status:"booklet_pending",issued_tickets:issued,updated_at:new Date().toISOString()})});
   }
   try{await provision(bookingId,p.parent.last_name)}catch(e){
