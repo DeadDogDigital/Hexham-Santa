@@ -71,7 +71,8 @@ export default async request => {
 
     const eventId = clean(body.event_id), seriesId = clean(body.event_series_id), ticketTypeId = clean(body.ticket_type_id);
     const parent = body.parent || {};
-    const children = Array.isArray(body.children) ? body.children : [];\n    const detailsMode = body.child_details_mode === "email" ? "email" : "now";
+    const children = Array.isArray(body.children) ? body.children : [];
+    const detailsMode = body.child_details_mode === "email" ? "email" : "now";
     const first = clean(parent.first_name), last = clean(parent.last_name), email = clean(parent.email), phone = clean(parent.phone);
     const paymentMethod = clean(body.payment_method);
     if (!eventId || !seriesId || !ticketTypeId || !first || !last || !email || !children.length || children.length > 10) return json({ error: "Complete the session, parent details and child details before taking payment." }, 400);
