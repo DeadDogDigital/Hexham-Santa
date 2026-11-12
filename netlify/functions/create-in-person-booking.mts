@@ -71,18 +71,18 @@ export default async request => {
 
     const eventId = clean(body.event_id), seriesId = clean(body.event_series_id), ticketTypeId = clean(body.ticket_type_id);
     const parent = body.parent || {};
-    const children = Array.isArray(body.children) ? body.children : [];
+    const children = Array.isArray(body.children) ? body.children : [];\n    const detailsMode = body.child_details_mode === "email" ? "email" : "now";
     const first = clean(parent.first_name), last = clean(parent.last_name), email = clean(parent.email), phone = clean(parent.phone);
     const paymentMethod = clean(body.payment_method);
     if (!eventId || !seriesId || !ticketTypeId || !first || !last || !email || !children.length || children.length > 10) return json({ error: "Complete the session, parent details and child details before taking payment." }, 400);
     if (!["cash", "card", "bank_transfer", "other"].includes(paymentMethod)) return json({ error: "Choose a valid payment method." }, 400);
-    if (children.some(c => !clean(c.preferred_name))) return json({ error: "Every child needs a name." }, 400);
+    if (detailsMode === "now" && children.some(c => !clean(c.preferred_name))) return json({ error: "Every child needs a name." }, 400);
     if (children.some(c => c.age !== undefined && c.age !== null && c.age !== "" && (!Number.isInteger(Number(c.age)) || Number(c.age) < 0 || Number(c.age) > 18))) return json({ error: "A child's age must be a whole number between 0 and 18." }, 400);
 
     const payload = {
       event_id: eventId, event_series_id: seriesId, ticket_type_id: ticketTypeId,
       parent: { first_name: first, last_name: last, email, phone },
-      children: children.map(c => ({ preferred_name: clean(c.preferred_name).slice(0, 100), age: Number.isInteger(Number(c.age)) && c.age !== "" ? Number(c.age) : null, interests: clean(c.interests).slice(0, 1000), santa_notes: clean(c.santa_notes).slice(0, 1000) })),
+      child_details_mode: detailsMode, children: children.map(c => ({ preferred_name: detailsMode === "email" ? (clean(c.preferred_name).slice(0,100) || "Details awaited") : clean(c.preferred_name).slice(0, 100), age: Number.isInteger(Number(c.age)) && c.age !== "" ? Number(c.age) : null, interests: clean(c.interests).slice(0, 1000), santa_notes: clean(c.santa_notes).slice(0, 1000) })),
       payment_method: paymentMethod, event_name: clean(body.event_name), visit_starts_at: body.visit_starts_at || null, visit_ends_at: body.visit_ends_at || null
     };
 
@@ -113,7 +113,7 @@ export default async request => {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          event_id: eventId, ticket_type_id: ticketTypeId, full_name: child.preferred_name,
+          event_id: eventId, ticket_type_id: ticketTypeId, full_name: detailsMode === "email" ? (first + " " + last) : child.preferred_name,
           reference: "santa-box-office:" + attemptId + ":" + (i + 1), send_email: "false"
         })
       });
@@ -140,7 +140,7 @@ export default async request => {
       method: "POST",
       body: JSON.stringify(payload.children.map((child, i) => ({
         booking_id: bookingRow.id, ticket_tailor_ticket_id: issued[i].id,
-        preferred_name: child.preferred_name, age: child.age, interests: child.interests || null, santa_notes: child.santa_notes || null
+        preferred_name: child.preferred_name, age: detailsMode === "email" ? null : child.age, interests: child.interests || null, santa_notes: child.santa_notes || null
       })))
     });
 
@@ -149,7 +149,7 @@ export default async request => {
     });
 
     try {
-      await provisionBooklet(bookingRow.id, last);
+      await provisionBooklet(bookingRow.id, last);\n      if (detailsMode === "email") {\n        const rawToken = crypto.randomBytes(32).toString("base64url");\n        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");\n        const expiry = new Date(new Date(payload.visit_starts_at).getTime() - 36 * 60 * 60 * 1000).toISOString();\n        if (new Date(expiry) <= new Date()) throw new Error("There is not enough time before the visit to request child details by email.");\n        await db("santa_booking_update_tokens", { method: "POST", body: JSON.stringify({ booking_id: bookingRow.id, token_hash: tokenHash, expires_at: expiry }) });\n        const tokenResponse = await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request", { method: "POST", headers: { "content-type": "application/json", Authorization: request.headers.get("authorization") || "", apikey: SUPABASE_ANON_KEY }, body: JSON.stringify({ booking_id: bookingRow.id, token: rawToken }) });\n        if (tokenResponse.ok) { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "sent", child_info_request_sent_at: new Date().toISOString() }) }); }\n        else { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed" }) }); }\n      }
     } catch (error) {
       await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ provisioning_status: "recovery_required", provisioning_error: error.message, updated_at: new Date().toISOString() }) });
       await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "recovery_required", error_message: error.message, updated_at: new Date().toISOString() }) });
@@ -157,7 +157,7 @@ export default async request => {
     }
 
     await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "complete", booking_id: bookingRow.id, issued_tickets: issued, error_message: null, updated_at: new Date().toISOString() }) });
-    return json({ ok: true, booking_id: bookingRow.id, issued_tickets: issued });
+    return json({ ok: true, booking_id: bookingRow.id, issued_tickets: issued, child_details_email: detailsMode === "email" });
   } catch (error) {
     if (attemptId && validUuid(attemptId)) {
       try { await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "recovery_required", error_message: error.message || "Unknown failure", updated_at: new Date().toISOString() }) }); } catch {}
