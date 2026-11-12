@@ -312,11 +312,12 @@ async function submitBoxOfficeBooking(){
  if(!parent.first_name||!parent.last_name||!parent.email||children.some(c=>!c.preferred_name))return boxOfficeMessage("Enter the parent’s name and email, and a name for every child.",true);
  if(children.some(c=>c.age!==""&&(!Number.isInteger(Number(c.age))||Number(c.age)<0||Number(c.age)>18)))return boxOfficeMessage("Child ages must be between 0 and 18.",true);
  if(ticket.remaining<children.length)return boxOfficeMessage("There are not enough tickets remaining for this booking.",true);
- if(!confirm("Issue "+children.length+" Ticket Tailor ticket(s) for "+parent.first_name+" "+parent.last_name+"? Confirm that payment has been received."))return;
- const button=$("#bo-submit");button.disabled=true;button.textContent="Creating booking…";
  const unitPrice=Number(ticket.price)/100;
+ if(!Number.isFinite(unitPrice)||unitPrice<0)return boxOfficeMessage("Ticket Tailor has not returned a valid price for this ticket type. Do not take payment.",true);
  const totalPrice=unitPrice*children.length;
- const priceLabel=Number.isFinite(unitPrice)?new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(totalPrice):"the Ticket Tailor price";
+ const priceLabel=new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(totalPrice);
+ if(!confirm("Issue "+children.length+" Ticket Tailor ticket(s) for "+parent.first_name+" "+parent.last_name+"?\n\nTicket price: "+formatBoxOfficePrice(ticket)+" each\nTotal to collect: "+priceLabel+"\n\nConfirm that the full payment has been received."))return;
+ const button=$("#bo-submit");button.disabled=true;button.textContent="Creating booking…";
  boxOfficeMessage("Checking live availability and issuing tickets. Please do not close this page or submit again.");
  try{
   const {data:{session}}=await sb.auth.getSession();
