@@ -71,9 +71,7 @@ async function linkTreatsBooklet(bookingId){
   }
   if(!/^[A-Za-z0-9_-]{8,200}$/.test(token))return alert("The booklet token doesn't look valid. Paste the full Treats link or its token.");
   const family=((booking.parent_first_name||"")+" "+(booking.parent_last_name||"")).trim()||"this family";
-  if(!confirm("Link this Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"?
-
-Make sure you copied the link from the correct family booklet."))return;
+  if(!confirm("Link this Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"?\n\nMake sure you copied the link from the correct family booklet."))return;
   const {error}=await sb.from("santa_bookings").update({treat_booklet_id:token,updated_at:new Date().toISOString()}).eq("id",bookingId).is("treat_booklet_id",null);
   if(error){alert("Couldn't link the Treats booklet: "+error.message);return load();}
   alert("Treats booklet linked to this booking. The family QR is now available in the booking details.");
