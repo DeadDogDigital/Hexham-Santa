@@ -42,8 +42,17 @@ async function ticketTailor(path, options = {}) {
 }
 
 async function events() {
-  const result = await ticketTailor("/events?limit=100&status=published");
-  return (result?.data || []).map(event => ({
+  const all = [];
+  let cursor = null;
+  for (let page = 0; page < 20; page++) {
+    const result = await ticketTailor("/events?limit=100&status=published" + (cursor ? "&starting_after=" + encodeURIComponent(cursor) : ""));
+    const batch = result?.data || [];
+    all.push(...batch);
+    if (batch.length < 100 || !result?.links?.next) break;
+    cursor = batch[batch.length - 1]?.id;
+    if (!cursor) break;
+  }
+  return all.map(event => ({
     id: event.id,
     event_series_id: event.event_series_id,
     name: event.name,
@@ -55,7 +64,7 @@ async function events() {
       id: ticket.id, name: ticket.name, price: ticket.price, currency: event.currency || "gbp",
       status: ticket.status, quantity: ticket.quantity, quantity_held: ticket.quantity_held,
       quantity_issued: ticket.quantity_issued,
-      remaining: Math.max(0, Number(ticket.quantity || 0) - Number(ticket.quantity_held || 0) - Number(ticket.quantity_issued || 0))
+      remaining: Math.max(0, Number(ticket.quantity_total ?? (Number(ticket.quantity || 0) + Number(ticket.quantity_issued || 0))) - Number(ticket.quantity_issued || 0) - Number(ticket.quantity_held || 0) - Number(ticket.quantity_in_baskets || 0))
     })).filter(ticket => ["on_sale", "admin_only"].includes(ticket.status))
   }));
 }
