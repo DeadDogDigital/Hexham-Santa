@@ -107,7 +107,7 @@ export default async request => {
     for (let i = 0; i < payload.children.length; i++) {
       const child = payload.children[i];
       const names = child.preferred_name.split(/\\s+/);
-      const ticket = await tt("/issued_tickets", {
+      const ticketResponse = await tt("/issued_tickets", {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -116,7 +116,9 @@ export default async request => {
           reference: "santa-box-office:" + attemptId + ":" + (i + 1), send_email: "false"
         })
       });
-      issued.push({ id: ticket.id, barcode: ticket.barcode || null, qr_code_url: ticket.qr_code_url || ticket.barcode_url || null, child_name: child.preferred_name });
+      const ticket = Array.isArray(ticketResponse?.data) ? ticketResponse.data[0] : ticketResponse?.data || ticketResponse;
+      if (!ticket?.id) throw new Error("Ticket Tailor returned an unexpected ticket response. This attempt is held for recovery; do not submit it again.");
+      issued.push({ id: ticket.id, barcode: ticket.barcode || null, qr_code_url: ticket.qr_code_url || ticket.barcode_url || null, reference: ticket.reference || ("santa-box-office:" + attemptId + ":" + (i + 1)), child_name: child.preferred_name });
       await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ issued_tickets: issued, updated_at: new Date().toISOString() }) });
     }
 
