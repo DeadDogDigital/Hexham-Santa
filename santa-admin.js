@@ -50,7 +50,7 @@ function bookingCard(b){
   const extraHtml=extras.map((x,i)=>'<div class="extra-treat-row"><strong>Additional booklet '+(i+1)+(x.label?' · '+esc(x.label):'')+'</strong><p><button type="button" data-show-extra-qr="'+esc(b.id)+'" data-extra-token="'+esc(x.treat_booklet_id)+'">SHOW ADDITIONAL QR</button> <a href="https://giftlocal.netlify.app/treats/'+encodeURIComponent(x.treat_booklet_id)+'" target="_blank" rel="noopener">Open booklet</a></p></div>').join('');
   const treatsHtml='<div class="treats-box"><h3>🎁 Santa’s Local Treats</h3>'+(token?'<p>Original booking booklet is linked and unchanged.</p><button type="button" data-show-qr="'+esc(b.id)+'">SHOW ORIGINAL FAMILY QR</button>':'<p>No original booklet is linked to this booking.</p>')+'<p class="muted">Every booking keeps its original booklet. Additional booklets are listed separately below.</p>'+extraHtml+'<div class="extra-booklet-add"><label for="extra-treats-token-'+esc(b.id)+'">Add an additional booklet link</label><input id="extra-treats-token-'+esc(b.id)+'" type="url" placeholder="Paste GiftLocal booklet link"><input id="extra-treats-label-'+esc(b.id)+'" type="text" placeholder="Optional label (e.g. Family 2)"><button type="button" data-add-extra-treats="'+esc(b.id)+'">ADD ADDITIONAL BOOKLET</button></div></div>';
   const groupControls=isGroupBooking(b)&&!isCancelled(b)?'<div class="booking-actions print-hide"><label class="group-select"><input type="checkbox" data-group-select="'+esc(b.id)+'" '+(selected?"checked":"")+'> Include in group print list</label><label class="checkin-control"><input type="checkbox" data-checkin="'+esc(b.id)+'" '+(checkedIn?"checked":"")+'> Checked in</label>'+(checkedIn?'<span class="checkin-label">✓ Arrived</span>':"")+'</div>':"";
-  return '<article class="booking '+statusClass+(selected?' group-selected':'')+'" data-booking-card="'+esc(b.id)+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+(isGroupBooking(b)?' <span class="muted" style="font-size:.8em">· GROUP</span>':' <span class="muted" style="font-size:.8em">· PRIVATE</span>')+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div>'+groupControls+'<button type="button" class="booking-toggle" aria-expanded="false" data-toggle-booking="'+esc(b.id)+'">View booking details ＋</button><div class="booking-details hidden" id="details-'+esc(b.id)+'"><h3>Visit details</h3><p><strong>Visit time:</strong> '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Visit type:</strong> '+(isGroupBooking(b)?"Group visit":"Private visit")+'</p><p><strong>Parent:</strong> '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+'</p><p><strong>Email:</strong> '+esc(b.parent_email||"Not provided")+'</p><p><strong>Phone:</strong> '+esc(b.parent_phone||"Not provided")+'</p><h3>Children and Santa notes</h3><div class="children">'+childHtml+'</div>'+treatsHtml+'</div></article>';
+  return '<article class="booking '+statusClass+(selected?' group-selected':'')+'" data-booking-card="'+esc(b.id)+'"><div class="booking-top"><div><div class="visit-time">'+esc(formatDateTime(b.visit_starts_at))+(isGroupBooking(b)?' <span class="muted" style="font-size:.8em">· GROUP</span>':' <span class="muted" style="font-size:.8em">· PRIVATE</span>')+'</div><div class="parent">'+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Parent name not provided")+'</div><div class="muted">'+esc(b.parent_email||"No email")+(b.parent_phone?" · "+esc(b.parent_phone):"")+'</div><div class="muted">'+(b.booking_source&&b.booking_source!=="online"?"Source: "+esc(b.booking_source.replaceAll("_"," "))+" · ":"")+(b.payment_method?"Payment: "+esc(b.payment_method.replaceAll("_"," ")):"")+'</div></div><span class="status '+statusClass+'">'+statusLabel+'</span></div>'+groupControls+'<button type="button" class="booking-toggle" aria-expanded="false" data-toggle-booking="'+esc(b.id)+'">View booking details ＋</button><div class="booking-details hidden" id="details-'+esc(b.id)+'"><h3>Visit details</h3><p><strong>Visit time:</strong> '+esc(formatDateTime(b.visit_starts_at))+'</p><p><strong>Visit type:</strong> '+(isGroupBooking(b)?"Group visit":"Private visit")+'</p><p><strong>Parent:</strong> '+esc(((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Not provided")+'</p><p><strong>Email:</strong> '+esc(b.parent_email||"Not provided")+'</p><p><strong>Phone:</strong> '+esc(b.parent_phone||"Not provided")+'</p><h3>Children and Santa notes</h3><div class="children">'+childHtml+'</div>'+treatsHtml+'</div></article>';
 }
 async function linkTreatsBooklet(bookingId){
   const booking=allBookings.find(b=>b.id===bookingId);
@@ -258,12 +258,111 @@ async function removeChildPhoto(childId){
   if(removeError)console.warn("Photo path cleared but storage cleanup failed",removeError.message);
   await load();
 }
+
+let boxOfficeEvents = [];
+let currentBoxOfficeAttemptId = null;
+function boxOfficeMessage(text, isError=false){
+ const el=$("#bo-message"); if(!el)return;
+ el.textContent=text; el.classList.remove("hidden");
+ el.style.background=isError?"#f3d8d8":"#eee3cc";
+}
+function formatBoxOfficePrice(ticket){
+ const amount=Number(ticket?.price);
+ if(!Number.isFinite(amount))return "Price unavailable";
+ return amount===0?"Free":new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(amount/100);
+}
+function renderBoxOfficeChildren(){
+ const count=Number($("#bo-count")?.value||1), host=$("#bo-children");
+ if(!host)return;
+ host.innerHTML=Array.from({length:count},(_,i)=>'<div class="booking" style="margin-top:12px"><strong>Child '+(i+1)+'</strong><label>Child name</label><input data-bo-child-name="'+i+'" required><div class="row"><div style="flex:1"><label>Age</label><input data-bo-child-age="'+i+'" type="number" min="0" max="18"></div><div style="flex:2"><label>Interests</label><input data-bo-child-interests="'+i+'"></div></div><label>Anything Santa should mention</label><textarea data-bo-child-notes="'+i+'" rows="2"></textarea></div>').join("");
+}
+async function loadBoxOfficeEvents(){
+ const select=$("#bo-event"); if(!select)return;
+ select.innerHTML='<option value="">Loading sessions…</option>';
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/box-office-events",{headers:{Authorization:"Bearer "+session.access_token}});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Could not load sessions.");
+  boxOfficeEvents=data.events||[];
+  select.innerHTML='<option value="">Choose a session</option>'+boxOfficeEvents.map(e=>'<option value="'+esc(e.id)+'">'+esc(formatDateTime(e.start))+' · '+esc(e.name||"Santa session")+'</option>').join("");
+ }catch(error){select.innerHTML='<option value="">Sessions unavailable</option>';boxOfficeMessage(error.message,true)}
+}
+function updateBoxOfficeTicketTypes(){
+ const event=boxOfficeEvents.find(e=>e.id===$("#bo-event")?.value), select=$("#bo-ticket"), info=$("#bo-availability");
+ if(!select||!info)return;
+ if(!event){select.innerHTML='<option value="">Choose a session first</option>';select.disabled=true;info.textContent="Choose a session to see live ticket availability.";return}
+ const tickets=event.ticket_types||[];
+ select.innerHTML='<option value="">Choose ticket type</option>'+tickets.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · '+esc(formatBoxOfficePrice(t))+' · '+t.remaining+' available</option>').join("");
+ select.disabled=!tickets.length;
+ info.textContent=event.unavailable?"Ticket sales are currently unavailable.":tickets.length?tickets.map(t=>t.name+": "+formatBoxOfficePrice(t)+" each, "+t.remaining+" remaining").join(" · "):"No box office ticket types are available for this session.";
+}
+async function submitBoxOfficeBooking(){
+ const event=boxOfficeEvents.find(e=>e.id===$("#bo-event").value), ticket=event?.ticket_types?.find(t=>t.id===$("#bo-ticket").value);
+ if(!event||!ticket)return boxOfficeMessage("Choose a session and ticket type first.",true);
+ const children=Array.from({length:Number($("#bo-count").value)},(_,i)=>({
+  preferred_name:$('[data-bo-child-name="'+i+'"]').value.trim(),
+  age:$('[data-bo-child-age="'+i+'"]').value,
+  interests:$('[data-bo-child-interests="'+i+'"]').value.trim(),
+  santa_notes:$('[data-bo-child-notes="'+i+'"]').value.trim()
+ }));
+ const parent={first_name:$("#bo-first").value.trim(),last_name:$("#bo-last").value.trim(),email:$("#bo-email").value.trim(),phone:$("#bo-phone").value.trim()};
+ const emailDetails=$("#bo-email-child-details")?.checked===true;
+ if(!parent.first_name||!parent.last_name||!parent.email||(!emailDetails&&children.some(c=>!c.preferred_name)))return boxOfficeMessage("Enter the parent’s name and email, and a name for every child unless you are emailing the details form.",true);
+ if(children.some(c=>c.age!==""&&(!Number.isInteger(Number(c.age))||Number(c.age)<0||Number(c.age)>18)))return boxOfficeMessage("Child ages must be between 0 and 18.",true);
+ if(ticket.remaining<children.length)return boxOfficeMessage("There are not enough tickets remaining for this booking.",true);
+ const unitPrice=Number(ticket.price)/100;
+ if(!Number.isFinite(unitPrice)||unitPrice<0)return boxOfficeMessage("Ticket Tailor has not returned a valid price for this ticket type. Do not take payment.",true);
+ const totalPrice=unitPrice*children.length;
+ const priceLabel=new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(totalPrice);
+ if(!confirm("Issue "+children.length+" Ticket Tailor ticket(s) for "+parent.first_name+" "+parent.last_name+"?\n\nTicket price: "+formatBoxOfficePrice(ticket)+" each\nTotal to collect: "+priceLabel+"\n\nConfirm that the full payment has been received."))return;
+ const button=$("#bo-submit");button.disabled=true;button.textContent="Creating booking…";
+ boxOfficeMessage("Checking live availability and issuing tickets. Please do not close this page or submit again.");
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/create-in-person-booking",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({
+   idempotency_key:currentBoxOfficeAttemptId||(currentBoxOfficeAttemptId=crypto.randomUUID()),event_id:event.id,event_series_id:event.event_series_id,ticket_type_id:ticket.id,
+   event_name:event.name,visit_starts_at:event.start,visit_ends_at:event.end,parent,children,payment_method:$("#bo-payment").value,child_details_mode:emailDetails?"email":"now"
+  })});
+  const result=await response.json();
+  if(!response.ok||!result.ok){
+   boxOfficeMessage(result.message||result.error||"Booking could not be completed. "+(result.recovery_required?"The issued tickets need recovery. Do not sell them again.":""),true);
+   return;
+  }
+  currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");
+  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued at "+formatBoxOfficePrice(ticket)+" each ("+priceLabel+" total). "+(emailDetails?"A secure parent details email was requested. ":"")+"The booking is now in the dashboard.");
+  ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
+  $("#bo-count").value="1";$("#bo-email-child-details").checked=false;renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
+ }catch(error){boxOfficeMessage(error.message||"Booking request failed. Do not submit again until the attempt has been reconciled.",true);$("#bo-recover").classList.remove("hidden");}
+ finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
+}
+
+
+async function recoverBoxOfficeAttempt(){
+ if(!currentBoxOfficeAttemptId)return boxOfficeMessage("There is no incomplete attempt to reconcile.",true);
+ const button=$("#bo-recover");button.disabled=true;button.textContent="Checking Ticket Tailor…";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/recover-box-office-attempt",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({attempt_id:currentBoxOfficeAttemptId})});
+  const result=await response.json();
+  if(result.ok&&result.complete){
+   currentBoxOfficeAttemptId=null;button.classList.add("hidden");
+   boxOfficeMessage("Recovery complete. The existing tickets have been reconciled and the booking is now in the dashboard.");
+   await load();
+  }else{
+   boxOfficeMessage(result.message||result.error||"Recovery is still required. Do not submit this sale again.",true);
+  }
+ }catch(error){boxOfficeMessage(error.message||"Could not reconcile this attempt. Do not submit it again.",true)}
+ finally{button.disabled=false;button.textContent="Reconcile incomplete booking"}
+}
+
 async function load(){
  const {data:{user}}=await sb.auth.getUser();
  if(!user){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");return}
  const boot=await bootstrap();
  if(!boot.ok){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");message(boot.error?.message||"This account is not authorised as a Santa admin.");return}
  $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");$("#who").textContent=user.email||"Signed in";
+ loadBoxOfficeEvents();
  const {data,error}=await sb.from("santa_bookings").select("*,santa_children(*)").order("visit_starts_at");
  if(error){$("#bookings").innerHTML="<p>"+esc(error.message)+"</p>";return}
  allBookings=data||[];
@@ -299,8 +398,27 @@ $("#signup").onclick=async()=>{
  message("Account created. Check your email if Supabase asks you to confirm the account, then sign in.");
 };
 $("#login").onclick=async()=>{
- const {error}=await sb.auth.signInWithPassword({email:$("#email").value.trim(),password:$("#password").value});
- if(error)message(error.message);else load();
+ const button=$("#login");
+ const email=$("#email").value.trim(),password=$("#password").value;
+ if(!email||!password)return message("Enter your email address and password.");
+ button.disabled=true;button.textContent="Signing in…";
+ $("#msg").classList.add("hidden");
+ try{
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  if(!data?.user)throw new Error("Supabase did not return a signed-in user.");
+  await load();
+ }catch(error){
+  console.error("Santa admin sign-in failed",error);
+  message(error?.message||"Sign-in failed. Please try again.");
+ }finally{
+  button.disabled=false;button.textContent="Sign in";
+ }
 };
 $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
+$("#bo-count")?.addEventListener("change",renderBoxOfficeChildren);
+$("#bo-event")?.addEventListener("change",updateBoxOfficeTicketTypes);
+$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);
+$("#bo-recover")?.addEventListener("click",recoverBoxOfficeAttempt);
+renderBoxOfficeChildren();
