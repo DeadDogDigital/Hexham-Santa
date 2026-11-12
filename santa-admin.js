@@ -71,7 +71,9 @@ async function linkTreatsBooklet(bookingId){
   }
   if(!/^[A-Za-z0-9_-]{8,200}$/.test(token))return alert("The booklet token doesn't look valid. Paste the full Treats link or its token.");
   const family=((booking.parent_first_name||"")+" "+(booking.parent_last_name||"")).trim()||"this family";
-  if(!confirm("Link this Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"?\n\nMake sure you copied the link from the correct family booklet."))return;
+  if(!confirm("Link this Treats booklet to "+family+"’s booking at "+formatDateTime(booking.visit_starts_at)+"?
+
+Make sure you copied the link from the correct family booklet."))return;
   const {error}=await sb.from("santa_bookings").update({treat_booklet_id:token,updated_at:new Date().toISOString()}).eq("id",bookingId).is("treat_booklet_id",null);
   if(error){alert("Couldn't link the Treats booklet: "+error.message);return load();}
   alert("Treats booklet linked to this booking. The family QR is now available in the booking details.");
@@ -259,7 +261,8 @@ async function removeChildPhoto(childId){
   await load();
 }
 
-let boxOfficeEvents = [];\nlet currentBoxOfficeAttemptId = null;
+let boxOfficeEvents = [];
+let currentBoxOfficeAttemptId = null;
 function boxOfficeMessage(text, isError=false){
  const el=$("#bo-message"); if(!el)return;
  el.textContent=text; el.classList.remove("hidden");
@@ -318,13 +321,15 @@ async function submitBoxOfficeBooking(){
    boxOfficeMessage(result.message||result.error||"Booking could not be completed. "+(result.recovery_required?"The issued tickets need recovery. Do not sell them again.":""),true);
    return;
   }
-  currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");\n  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
+  currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");
+  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
   ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
   $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
  }catch(error){boxOfficeMessage(error.message||"Booking request failed. Do not submit again until the attempt has been reconciled.",true);$("#bo-recover").classList.remove("hidden");}
  finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
 }
-\n
+
+
 async function recoverBoxOfficeAttempt(){
  if(!currentBoxOfficeAttemptId)return boxOfficeMessage("There is no incomplete attempt to reconcile.",true);
  const button=$("#bo-recover");button.disabled=true;button.textContent="Checking Ticket Tailor…";
@@ -342,12 +347,14 @@ async function recoverBoxOfficeAttempt(){
  }catch(error){boxOfficeMessage(error.message||"Could not reconcile this attempt. Do not submit it again.",true)}
  finally{button.disabled=false;button.textContent="Reconcile incomplete booking"}
 }
-\nasync function load(){
+
+async function load(){
  const {data:{user}}=await sb.auth.getUser();
  if(!user){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");return}
  const boot=await bootstrap();
  if(!boot.ok){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");message(boot.error?.message||"This account is not authorised as a Santa admin.");return}
- $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");$("#who").textContent=user.email||"Signed in";\n loadBoxOfficeEvents();
+ $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");$("#who").textContent=user.email||"Signed in";
+ loadBoxOfficeEvents();
  const {data,error}=await sb.from("santa_bookings").select("*,santa_children(*)").order("visit_starts_at");
  if(error){$("#bookings").innerHTML="<p>"+esc(error.message)+"</p>";return}
  allBookings=data||[];
@@ -390,5 +397,6 @@ $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
 $("#bo-count")?.addEventListener("change",renderBoxOfficeChildren);
 $("#bo-event")?.addEventListener("change",updateBoxOfficeTicketTypes);
-$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);\n$("#bo-recover")?.addEventListener("click",recoverBoxOfficeAttempt);
+$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);
+$("#bo-recover")?.addEventListener("click",recoverBoxOfficeAttempt);
 renderBoxOfficeChildren();
