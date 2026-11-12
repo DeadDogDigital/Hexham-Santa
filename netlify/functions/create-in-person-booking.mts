@@ -19,7 +19,7 @@ async function db(path, options = {}) {
 }
 
 async function requireAdmin(request) {
-  const token = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
   const auth = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token } });
   if (!auth.ok) return null;
@@ -106,13 +106,12 @@ export default async request => {
     const issued = [];
     for (let i = 0; i < payload.children.length; i++) {
       const child = payload.children[i];
-      const names = child.preferred_name.split(/\\s+/);
+      const names = child.preferred_name.split(/\s+/);
       const ticketResponse = await tt("/issued_tickets", {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          event_id: eventId, event_series_id: seriesId, ticket_type_id: ticketTypeId,
-          full_name: child.preferred_name, first_name: names[0], last_name: names.slice(1).join(" "),
+          event_id: eventId, ticket_type_id: ticketTypeId, full_name: child.preferred_name,
           reference: "santa-box-office:" + attemptId + ":" + (i + 1), send_email: "false"
         })
       });
