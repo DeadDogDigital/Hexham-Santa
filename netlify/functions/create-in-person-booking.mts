@@ -77,6 +77,7 @@ export default async request => {
     if (!eventId || !seriesId || !ticketTypeId || !first || !last || !email || !children.length || children.length > 10) return json({ error: "Complete the session, parent details and child details before taking payment." }, 400);
     if (!["cash", "card", "bank_transfer", "other"].includes(paymentMethod)) return json({ error: "Choose a valid payment method." }, 400);
     if (children.some(c => !clean(c.preferred_name))) return json({ error: "Every child needs a name." }, 400);
+    if (children.some(c => c.age !== undefined && c.age !== null && c.age !== "" && (!Number.isInteger(Number(c.age)) || Number(c.age) < 0 || Number(c.age) > 18))) return json({ error: "A child's age must be a whole number between 0 and 18." }, 400);
 
     const payload = {
       event_id: eventId, event_series_id: seriesId, ticket_type_id: ticketTypeId,
