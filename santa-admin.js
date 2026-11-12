@@ -259,7 +259,7 @@ async function removeChildPhoto(childId){
   await load();
 }
 
-let boxOfficeEvents = [];
+let boxOfficeEvents = [];\nlet currentBoxOfficeAttemptId = null;
 function boxOfficeMessage(text, isError=false){
  const el=$("#bo-message"); if(!el)return;
  el.textContent=text; el.classList.remove("hidden");
@@ -310,7 +310,7 @@ async function submitBoxOfficeBooking(){
  try{
   const {data:{session}}=await sb.auth.getSession();
   const response=await fetch("/api/create-in-person-booking",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({
-   idempotency_key:crypto.randomUUID(),event_id:event.id,event_series_id:event.event_series_id,ticket_type_id:ticket.id,
+   idempotency_key:currentBoxOfficeAttemptId||(currentBoxOfficeAttemptId=crypto.randomUUID()),event_id:event.id,event_series_id:event.event_series_id,ticket_type_id:ticket.id,
    event_name:event.name,visit_starts_at:event.start,visit_ends_at:event.end,parent,children,payment_method:$("#bo-payment").value
   })});
   const result=await response.json();
@@ -318,11 +318,29 @@ async function submitBoxOfficeBooking(){
    boxOfficeMessage(result.message||result.error||"Booking could not be completed. "+(result.recovery_required?"The issued tickets need recovery. Do not sell them again.":""),true);
    return;
   }
-  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
+  currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");\n  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
   ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
   $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
  }catch(error){boxOfficeMessage(error.message||"Booking request failed. Check the dashboard before trying again.",true)}
  finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
+}
+\n
+async function recoverBoxOfficeAttempt(){
+ if(!currentBoxOfficeAttemptId)return boxOfficeMessage("There is no incomplete attempt to reconcile.",true);
+ const button=$("#bo-recover");button.disabled=true;button.textContent="Checking Ticket Tailor…";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/recover-box-office-attempt",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({attempt_id:currentBoxOfficeAttemptId})});
+  const result=await response.json();
+  if(result.ok&&result.complete){
+   currentBoxOfficeAttemptId=null;button.classList.add("hidden");
+   boxOfficeMessage("Recovery complete. The existing tickets have been reconciled and the booking is now in the dashboard.");
+   await load();
+  }else{
+   boxOfficeMessage(result.message||result.error||"Recovery is still required. Do not submit this sale again.",true);
+  }
+ }catch(error){boxOfficeMessage(error.message||"Could not reconcile this attempt. Do not submit it again.",true)}
+ finally{button.disabled=false;button.textContent="Reconcile incomplete booking"}
 }
 \nasync function load(){
  const {data:{user}}=await sb.auth.getUser();
@@ -372,5 +390,5 @@ $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
 $("#bo-count")?.addEventListener("change",renderBoxOfficeChildren);
 $("#bo-event")?.addEventListener("change",updateBoxOfficeTicketTypes);
-$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);
+$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);\n$("#bo-recover")?.addEventListener("click",recoverBoxOfficeAttempt);
 renderBoxOfficeChildren();
