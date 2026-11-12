@@ -149,7 +149,17 @@ export default async request => {
     });
 
     try {
-      await provisionBooklet(bookingRow.id, last);\n      if (detailsMode === "email") {\n        const rawToken = crypto.randomBytes(32).toString("base64url");\n        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");\n        const expiry = new Date(new Date(payload.visit_starts_at).getTime() - 36 * 60 * 60 * 1000).toISOString();\n        if (new Date(expiry) <= new Date()) throw new Error("There is not enough time before the visit to request child details by email.");\n        await db("santa_booking_update_tokens", { method: "POST", body: JSON.stringify({ booking_id: bookingRow.id, token_hash: tokenHash, expires_at: expiry }) });\n        const tokenResponse = await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request", { method: "POST", headers: { "content-type": "application/json", Authorization: request.headers.get("authorization") || "", apikey: SUPABASE_ANON_KEY }, body: JSON.stringify({ booking_id: bookingRow.id, token: rawToken }) });\n        if (tokenResponse.ok) { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "sent", child_info_request_sent_at: new Date().toISOString() }) }); }\n        else { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed" }) }); }\n      }
+      await provisionBooklet(bookingRow.id, last);
+      if (detailsMode === "email") {
+        const rawToken = crypto.randomBytes(32).toString("base64url");
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        const expiry = new Date(new Date(payload.visit_starts_at).getTime() - 36 * 60 * 60 * 1000).toISOString();
+        if (new Date(expiry) <= new Date()) throw new Error("There is not enough time before the visit to request child details by email.");
+        await db("santa_booking_update_tokens", { method: "POST", body: JSON.stringify({ booking_id: bookingRow.id, token_hash: tokenHash, expires_at: expiry }) });
+        const tokenResponse = await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request", { method: "POST", headers: { "content-type": "application/json", Authorization: request.headers.get("authorization") || "", apikey: SUPABASE_ANON_KEY }, body: JSON.stringify({ booking_id: bookingRow.id, token: rawToken }) });
+        if (tokenResponse.ok) { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "sent", child_info_request_sent_at: new Date().toISOString() }) }); }
+        else { await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed" }) }); }
+      }
     } catch (error) {
       await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ provisioning_status: "recovery_required", provisioning_error: error.message, updated_at: new Date().toISOString() }) });
       await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "recovery_required", error_message: error.message, updated_at: new Date().toISOString() }) });
