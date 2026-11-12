@@ -11,7 +11,10 @@ alter table public.santa_bookings
   add column if not exists provisioning_status text not null default 'complete'
     check (provisioning_status in ('pending','tickets_issued','booklet_pending','complete','recovery_required')),
   add column if not exists provisioning_error text,
-  add column if not exists ticket_tailor_issued_ticket_ids jsonb not null default '[]'::jsonb;
+  add column if not exists ticket_tailor_issued_ticket_ids jsonb not null default '[]'::jsonb,
+  add column if not exists child_info_request_status text not null default 'not_requested'
+    check (child_info_request_status in ('not_requested','pending','sent','failed','completed')),
+  add column if not exists child_info_request_sent_at timestamptz;
 
 create table if not exists public.santa_box_office_attempts (
   id uuid primary key default gen_random_uuid(),
@@ -28,3 +31,16 @@ create table if not exists public.santa_box_office_attempts (
 );
 
 alter table public.santa_box_office_attempts enable row level security;
+
+
+create table if not exists public.santa_booking_update_tokens (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null references public.santa_bookings(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists santa_booking_update_tokens_booking_idx
+  on public.santa_booking_update_tokens(booking_id);
+alter table public.santa_booking_update_tokens enable row level security;
