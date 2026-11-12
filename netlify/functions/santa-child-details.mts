@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
-const URL="https://atqhqizzfnsokulmupmy.supabase.co";
+const SUPABASE_URL="https://atqhqizzfnsokulmupmy.supabase.co";
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json","cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff"}});
 const clean=v=>typeof v==="string"?v.trim():"";
-async function db(path,options={}){const key=Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!key)throw new Error("Service unavailable.");const r=await fetch(URL+"/rest/v1/"+path,{...options,headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json",Prefer:"return=representation",...(options.headers||{})}});const t=await r.text();let d;try{d=t?JSON.parse(t):null}catch{d=t}if(!r.ok)throw new Error("Database request failed.");return d}
+async function db(path,options={}){const key=Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!key)throw new Error("Service unavailable.");const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{...options,headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json",Prefer:"return=representation",...(options.headers||{})}});const t=await r.text();let d;try{d=t?JSON.parse(t):null}catch{d=t}if(!r.ok)throw new Error("Database request failed.");return d}
 async function tokenRow(token){if(!/^[A-Za-z0-9_-]{40,100}$/.test(token))return null;const hash=crypto.createHash("sha256").update(token).digest("hex");const rows=await db("santa_booking_update_tokens?select=id,booking_id,expires_at,revoked_at&token_hash=eq."+hash+"&limit=1");const row=rows[0];if(!row||row.revoked_at||new Date(row.expires_at)<=new Date())return null;return row}
 export default async req=>{
  if(!["GET","POST"].includes(req.method))return json({error:"Method not allowed"},405);
