@@ -321,7 +321,7 @@ async function submitBoxOfficeBooking(){
   currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");\n  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
   ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
   $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
- }catch(error){boxOfficeMessage(error.message||"Booking request failed. Check the dashboard before trying again.",true)}
+ }catch(error){boxOfficeMessage(error.message||"Booking request failed. Do not submit again until the attempt has been reconciled.",true);$("#bo-recover").classList.remove("hidden");}
  finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
 }
 \n
