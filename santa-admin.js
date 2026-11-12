@@ -390,8 +390,22 @@ $("#signup").onclick=async()=>{
  message("Account created. Check your email if Supabase asks you to confirm the account, then sign in.");
 };
 $("#login").onclick=async()=>{
- const {error}=await sb.auth.signInWithPassword({email:$("#email").value.trim(),password:$("#password").value});
- if(error)message(error.message);else load();
+ const button=$("#login");
+ const email=$("#email").value.trim(),password=$("#password").value;
+ if(!email||!password)return message("Enter your email address and password.");
+ button.disabled=true;button.textContent="Signing in…";
+ $("#msg").classList.add("hidden");
+ try{
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  if(!data?.user)throw new Error("Supabase did not return a signed-in user.");
+  await load();
+ }catch(error){
+  console.error("Santa admin sign-in failed",error);
+  message(error?.message||"Sign-in failed. Please try again.");
+ }finally{
+  button.disabled=false;button.textContent="Sign in";
+ }
 };
 $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
