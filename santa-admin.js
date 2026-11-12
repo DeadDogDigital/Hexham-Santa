@@ -329,7 +329,7 @@ async function submitBoxOfficeBooking(){
  if(!user){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");return}
  const boot=await bootstrap();
  if(!boot.ok){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");message(boot.error?.message||"This account is not authorised as a Santa admin.");return}
- $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");$("#who").textContent=user.email||"Signed in";
+ $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");$("#who").textContent=user.email||"Signed in";\n loadBoxOfficeEvents();
  const {data,error}=await sb.from("santa_bookings").select("*,santa_children(*)").order("visit_starts_at");
  if(error){$("#bookings").innerHTML="<p>"+esc(error.message)+"</p>";return}
  allBookings=data||[];
