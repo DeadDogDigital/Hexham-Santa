@@ -268,6 +268,11 @@ function boxOfficeMessage(text, isError=false){
  el.textContent=text; el.classList.remove("hidden");
  el.style.background=isError?"#f3d8d8":"#eee3cc";
 }
+function formatBoxOfficePrice(ticket){
+ const amount=Number(ticket?.price);
+ if(!Number.isFinite(amount))return "Price unavailable";
+ return amount===0?"Free":new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(amount/100);
+}
 function renderBoxOfficeChildren(){
  const count=Number($("#bo-count")?.value||1), host=$("#bo-children");
  if(!host)return;
@@ -290,9 +295,9 @@ function updateBoxOfficeTicketTypes(){
  if(!select||!info)return;
  if(!event){select.innerHTML='<option value="">Choose a session first</option>';select.disabled=true;info.textContent="Choose a session to see live ticket availability.";return}
  const tickets=event.ticket_types||[];
- select.innerHTML='<option value="">Choose ticket type</option>'+tickets.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · '+t.remaining+' available</option>').join("");
+ select.innerHTML='<option value="">Choose ticket type</option>'+tickets.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · '+esc(formatBoxOfficePrice(t))+' · '+t.remaining+' available</option>').join("");
  select.disabled=!tickets.length;
- info.textContent=event.unavailable?"Ticket sales are currently unavailable.":tickets.length?tickets.map(t=>t.name+": "+t.remaining+" remaining").join(" · "):"No box office ticket types are available for this session.";
+ info.textContent=event.unavailable?"Ticket sales are currently unavailable.":tickets.length?tickets.map(t=>t.name+": "+formatBoxOfficePrice(t)+" each, "+t.remaining+" remaining").join(" · "):"No box office ticket types are available for this session.";
 }
 async function submitBoxOfficeBooking(){
  const event=boxOfficeEvents.find(e=>e.id===$("#bo-event").value), ticket=event?.ticket_types?.find(t=>t.id===$("#bo-ticket").value);
@@ -309,6 +314,9 @@ async function submitBoxOfficeBooking(){
  if(ticket.remaining<children.length)return boxOfficeMessage("There are not enough tickets remaining for this booking.",true);
  if(!confirm("Issue "+children.length+" Ticket Tailor ticket(s) for "+parent.first_name+" "+parent.last_name+"? Confirm that payment has been received."))return;
  const button=$("#bo-submit");button.disabled=true;button.textContent="Creating booking…";
+ const unitPrice=Number(ticket.price)/100;
+ const totalPrice=unitPrice*children.length;
+ const priceLabel=Number.isFinite(unitPrice)?new Intl.NumberFormat("en-GB",{style:"currency",currency:String(ticket.currency||"gbp").toUpperCase()}).format(totalPrice):"the Ticket Tailor price";
  boxOfficeMessage("Checking live availability and issuing tickets. Please do not close this page or submit again.");
  try{
   const {data:{session}}=await sb.auth.getSession();
@@ -322,7 +330,7 @@ async function submitBoxOfficeBooking(){
    return;
   }
   currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");
-  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
+  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued at "+formatBoxOfficePrice(ticket)+" each ("+priceLabel+" total). The booking is now in the dashboard.");
   ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
   $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
  }catch(error){boxOfficeMessage(error.message||"Booking request failed. Do not submit again until the attempt has been reconciled.",true);$("#bo-recover").classList.remove("hidden");}
