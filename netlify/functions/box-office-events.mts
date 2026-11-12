@@ -1,10 +1,6 @@
-import crypto from "node:crypto";
-
 const SUPABASE_URL = "https://atqhqizzfnsokulmupmy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_-TvnUkpHRB9jkkNqJQAXCA_tkaAeY7_";
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-const clean = value => typeof value === "string" ? value.trim() : "";
-
 async function db(path, options = {}) {
   const key = Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!key) throw new Error("Santa database configuration is incomplete.");
@@ -19,7 +15,7 @@ async function db(path, options = {}) {
 }
 
 async function requireAdmin(request) {
-  const token = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
   const auth = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token } });
   if (!auth.ok) return null;
