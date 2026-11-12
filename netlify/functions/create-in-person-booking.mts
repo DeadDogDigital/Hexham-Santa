@@ -98,7 +98,7 @@ export default async request => {
     const occurrence = await tt("/events/" + encodeURIComponent(eventId));
     const allocation = (occurrence.ticket_types || []).find(t => t.id === ticketTypeId);
     if (!allocation || !["on_sale", "admin_only"].includes(allocation.status)) throw new Error("That ticket type is no longer available for box office sales.");
-    const remaining = Number(allocation.quantity || 0) - Number(allocation.quantity_held || 0) - Number(allocation.quantity_issued || 0);
+    const total = Number(allocation.quantity_total ?? (Number(allocation.quantity || 0) + Number(allocation.quantity_issued || 0)));\n    const remaining = Math.max(0, total - Number(allocation.quantity_issued || 0) - Number(allocation.quantity_held || 0) - Number(allocation.quantity_in_baskets || 0));
     if (remaining < children.length) throw new Error("There are only " + Math.max(0, remaining) + " tickets remaining for that session.");
 
     await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "issuing_tickets", updated_at: new Date().toISOString() }) });
