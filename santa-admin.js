@@ -258,7 +258,73 @@ async function removeChildPhoto(childId){
   if(removeError)console.warn("Photo path cleared but storage cleanup failed",removeError.message);
   await load();
 }
-async function load(){
+
+let boxOfficeEvents = [];
+function boxOfficeMessage(text, isError=false){
+ const el=$("#bo-message"); if(!el)return;
+ el.textContent=text; el.classList.remove("hidden");
+ el.style.background=isError?"#f3d8d8":"#eee3cc";
+}
+function renderBoxOfficeChildren(){
+ const count=Number($("#bo-count")?.value||1), host=$("#bo-children");
+ if(!host)return;
+ host.innerHTML=Array.from({length:count},(_,i)=>'<div class="booking" style="margin-top:12px"><strong>Child '+(i+1)+'</strong><label>Child name</label><input data-bo-child-name="'+i+'" required><div class="row"><div style="flex:1"><label>Age</label><input data-bo-child-age="'+i+'" type="number" min="0" max="18"></div><div style="flex:2"><label>Interests</label><input data-bo-child-interests="'+i+'"></div></div><label>Anything Santa should mention</label><textarea data-bo-child-notes="'+i+'" rows="2"></textarea></div>').join("");
+}
+async function loadBoxOfficeEvents(){
+ const select=$("#bo-event"); if(!select)return;
+ select.innerHTML='<option value="">Loading sessions…</option>';
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/box-office-events",{headers:{Authorization:"Bearer "+session.access_token}});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Could not load sessions.");
+  boxOfficeEvents=data.events||[];
+  select.innerHTML='<option value="">Choose a session</option>'+boxOfficeEvents.map(e=>'<option value="'+esc(e.id)+'">'+esc(formatDateTime(e.start))+' · '+esc(e.name||"Santa session")+'</option>').join("");
+ }catch(error){select.innerHTML='<option value="">Sessions unavailable</option>';boxOfficeMessage(error.message,true)}
+}
+function updateBoxOfficeTicketTypes(){
+ const event=boxOfficeEvents.find(e=>e.id===$("#bo-event")?.value), select=$("#bo-ticket"), info=$("#bo-availability");
+ if(!select||!info)return;
+ if(!event){select.innerHTML='<option value="">Choose a session first</option>';select.disabled=true;info.textContent="Choose a session to see live ticket availability.";return}
+ const tickets=event.ticket_types||[];
+ select.innerHTML='<option value="">Choose ticket type</option>'+tickets.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · '+t.remaining+' available</option>').join("");
+ select.disabled=!tickets.length;
+ info.textContent=event.unavailable?"Ticket sales are currently unavailable.":tickets.length?tickets.map(t=>t.name+": "+t.remaining+" remaining").join(" · "):"No box office ticket types are available for this session.";
+}
+async function submitBoxOfficeBooking(){
+ const event=boxOfficeEvents.find(e=>e.id===$("#bo-event").value), ticket=event?.ticket_types?.find(t=>t.id===$("#bo-ticket").value);
+ if(!event||!ticket)return boxOfficeMessage("Choose a session and ticket type first.",true);
+ const children=Array.from({length:Number($("#bo-count").value)},(_,i)=>({
+  preferred_name:$('[data-bo-child-name="'+i+'"]').value.trim(),
+  age:$('[data-bo-child-age="'+i+'"]').value,
+  interests:$('[data-bo-child-interests="'+i+'"]').value.trim(),
+  santa_notes:$('[data-bo-child-notes="'+i+'"]').value.trim()
+ }));
+ const parent={first_name:$("#bo-first").value.trim(),last_name:$("#bo-last").value.trim(),email:$("#bo-email").value.trim(),phone:$("#bo-phone").value.trim()};
+ if(!parent.first_name||!parent.last_name||!parent.email||children.some(c=>!c.preferred_name))return boxOfficeMessage("Enter the parent’s name and email, and a name for every child.",true);
+ if(children.some(c=>c.age!==""&&(!Number.isInteger(Number(c.age))||Number(c.age)<0||Number(c.age)>18)))return boxOfficeMessage("Child ages must be between 0 and 18.",true);
+ if(ticket.remaining<children.length)return boxOfficeMessage("There are not enough tickets remaining for this booking.",true);
+ if(!confirm("Issue "+children.length+" Ticket Tailor ticket(s) for "+parent.first_name+" "+parent.last_name+"? Confirm that payment has been received."))return;
+ const button=$("#bo-submit");button.disabled=true;button.textContent="Creating booking…";
+ boxOfficeMessage("Checking live availability and issuing tickets. Please do not close this page or submit again.");
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  const response=await fetch("/api/create-in-person-booking",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({
+   idempotency_key:crypto.randomUUID(),event_id:event.id,event_series_id:event.event_series_id,ticket_type_id:ticket.id,
+   event_name:event.name,visit_starts_at:event.start,visit_ends_at:event.end,parent,children,payment_method:$("#bo-payment").value
+  })});
+  const result=await response.json();
+  if(!response.ok||!result.ok){
+   boxOfficeMessage(result.message||result.error||"Booking could not be completed. "+(result.recovery_required?"The issued tickets need recovery. Do not sell them again.":""),true);
+   return;
+  }
+  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued. The booking is now in the dashboard.");
+  ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
+  $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
+ }catch(error){boxOfficeMessage(error.message||"Booking request failed. Check the dashboard before trying again.",true)}
+ finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
+}
+\nasync function load(){
  const {data:{user}}=await sb.auth.getUser();
  if(!user){$("#auth").classList.remove("hidden");$("#app").classList.add("hidden");return}
  const boot=await bootstrap();
@@ -304,3 +370,7 @@ $("#login").onclick=async()=>{
 };
 $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
+$("#bo-count")?.addEventListener("change",renderBoxOfficeChildren);
+$("#bo-event")?.addEventListener("change",updateBoxOfficeTicketTypes);
+$("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);
+renderBoxOfficeChildren();
