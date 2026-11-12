@@ -307,7 +307,8 @@ async function submitBoxOfficeBooking(){
   santa_notes:$('[data-bo-child-notes="'+i+'"]').value.trim()
  }));
  const parent={first_name:$("#bo-first").value.trim(),last_name:$("#bo-last").value.trim(),email:$("#bo-email").value.trim(),phone:$("#bo-phone").value.trim()};
- if(!parent.first_name||!parent.last_name||!parent.email||children.some(c=>!c.preferred_name))return boxOfficeMessage("Enter the parent’s name and email, and a name for every child.",true);
+ const emailDetails=$("#bo-email-child-details")?.checked===true;
+ if(!parent.first_name||!parent.last_name||!parent.email||(!emailDetails&&children.some(c=>!c.preferred_name)))return boxOfficeMessage("Enter the parent’s name and email, and a name for every child unless you are emailing the details form.",true);
  if(children.some(c=>c.age!==""&&(!Number.isInteger(Number(c.age))||Number(c.age)<0||Number(c.age)>18)))return boxOfficeMessage("Child ages must be between 0 and 18.",true);
  if(ticket.remaining<children.length)return boxOfficeMessage("There are not enough tickets remaining for this booking.",true);
  const unitPrice=Number(ticket.price)/100;
@@ -321,7 +322,7 @@ async function submitBoxOfficeBooking(){
   const {data:{session}}=await sb.auth.getSession();
   const response=await fetch("/api/create-in-person-booking",{method:"POST",headers:{"content-type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({
    idempotency_key:currentBoxOfficeAttemptId||(currentBoxOfficeAttemptId=crypto.randomUUID()),event_id:event.id,event_series_id:event.event_series_id,ticket_type_id:ticket.id,
-   event_name:event.name,visit_starts_at:event.start,visit_ends_at:event.end,parent,children,payment_method:$("#bo-payment").value
+   event_name:event.name,visit_starts_at:event.start,visit_ends_at:event.end,parent,children,payment_method:$("#bo-payment").value,child_details_mode:emailDetails?"email":"now"
   })});
   const result=await response.json();
   if(!response.ok||!result.ok){
@@ -329,9 +330,9 @@ async function submitBoxOfficeBooking(){
    return;
   }
   currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");
-  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued at "+formatBoxOfficePrice(ticket)+" each ("+priceLabel+" total). The booking is now in the dashboard.");
+  boxOfficeMessage("Booking created successfully. "+children.length+" Ticket Tailor ticket(s) issued at "+formatBoxOfficePrice(ticket)+" each ("+priceLabel+" total). "+(emailDetails?"A secure parent details email was requested. ":"")+"The booking is now in the dashboard.");
   ["#bo-first","#bo-last","#bo-email","#bo-phone"].forEach(id=>$(id).value="");
-  $("#bo-count").value="1";renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
+  $("#bo-count").value="1";$("#bo-email-child-details").checked=false;renderBoxOfficeChildren();await load();await loadBoxOfficeEvents();
  }catch(error){boxOfficeMessage(error.message||"Booking request failed. Do not submit again until the attempt has been reconciled.",true);$("#bo-recover").classList.remove("hidden");}
  finally{button.disabled=false;button.textContent="Create booking and issue tickets"}
 }
