@@ -421,6 +421,24 @@ $("#login").onclick=async()=>{
   button.disabled=false;button.textContent="Sign in";
  }
 };
+$("#forgot-password").onclick=async()=>{
+  const email=$("#email").value.trim();
+  if(!email)return message("Enter your email address first, then choose Forgot password.");
+  const button=$("#forgot-password");
+  button.disabled=true;button.textContent="Sending…";
+  $("#msg").classList.add("hidden");
+  try{
+    const {error}=await sb.auth.resetPasswordForEmail(email,{
+      redirectTo:window.location.origin+"/reset-password.html"
+    });
+    if(error)throw error;
+    message("If an account exists for that email address, a password reset link has been sent. Check your inbox and spam folder.");
+  }catch(error){
+    message(error?.message||"Could not send the password reset email. Please try again.");
+  }finally{
+    button.disabled=false;button.textContent="Forgot password?";
+  }
+};
 $("#logout").onclick=async()=>{await sb.auth.signOut();load()};
 load();
 $("#bo-count")?.addEventListener("change",renderBoxOfficeChildren);
