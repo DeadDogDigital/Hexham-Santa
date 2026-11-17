@@ -80,6 +80,7 @@ function validUuid(value) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[8
 export default async request => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
   let attemptId = null;
+  let attemptCreated = false;
   try {
     const user = await requireAdmin(request);
     if (!user) return json({ error: "You are not authorised to use the box office." }, 401);
@@ -115,7 +116,15 @@ export default async request => {
       return json({ error: "This booking attempt already exists and needs recovery. No further tickets have been issued.", attempt_id: a.id, status: a.status, issued_tickets: a.issued_tickets }, 409);
     }
 
-    await db("santa_box_office_attempts", { method: "POST", body: JSON.stringify({ idempotency_key: attemptId, status: "started", request_payload: payload, created_by: user.id }) });
+    try {
+      await db("santa_box_office_attempts", { method: "POST", body: JSON.stringify({ idempotency_key: attemptId, status: "started", request_payload: payload, created_by: user.id }) });
+      attemptCreated = true;
+    } catch (error) {
+      if (/duplicate key|unique constraint|23505/i.test(error.message || "")) {
+        return json({ error: "This booking attempt is already being processed. Do not submit it again; use recovery if it does not finish." }, 409);
+      }
+      throw error;
+    }
 
     // Re-read live inventory immediately before issuing. Ticket Tailor also atomically rejects any over-allocation.
     const occurrence = await tt("/events/" + encodeURIComponent(eventId));
@@ -196,7 +205,7 @@ export default async request => {
     await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "complete", booking_id: bookingRow.id, issued_tickets: issued, error_message: null, updated_at: new Date().toISOString() }) });
     return json({ ok: true, booking_id: bookingRow.id, issued_tickets: issued, child_details_email: detailsMode === "email" });
   } catch (error) {
-    if (attemptId && validUuid(attemptId)) {
+    if (attemptCreated && attemptId && validUuid(attemptId)) {
       try { await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), { method: "PATCH", body: JSON.stringify({ status: "recovery_required", error_message: error.message || "Unknown failure", updated_at: new Date().toISOString() }) }); } catch {}
     }
     return json({ error: error.message || "Could not complete the in-person booking.", attempt_id: attemptId }, 500);
