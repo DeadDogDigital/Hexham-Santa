@@ -128,8 +128,17 @@ export default async request => {
 
     // Re-read live inventory immediately before issuing. Ticket Tailor also atomically rejects any over-allocation.
     const occurrence = await tt("/events/" + encodeURIComponent(eventId));
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const eventUnavailable =
+      occurrence.hidden === true || occurrence.hidden === "true" ||
+      occurrence.unavailable === true || occurrence.unavailable === "true" ||
+      occurrence.status !== "published" ||
+      occurrence.tickets_available === false || occurrence.tickets_available === "false" ||
+      (Number(occurrence.tickets_available_at) > 0 && Number(occurrence.tickets_available_at) > nowSeconds) ||
+      (Number(occurrence.tickets_unavailable_at) > 0 && Number(occurrence.tickets_unavailable_at) <= nowSeconds);
+    if (eventUnavailable) throw new Error("This session is hidden, closed or not currently available in Ticket Tailor.");
     const allocation = (occurrence.ticket_types || []).find(t => t.id === ticketTypeId);
-    if (!allocation || !["on_sale", "admin_only"].includes(allocation.status)) throw new Error("That ticket type is no longer available for box office sales.");
+    if (!allocation || allocation.status !== "on_sale") throw new Error("That ticket type is not set to On sale in Ticket Tailor, so it cannot be sold at the Box Office.");
     const total = Number(allocation.quantity_total ?? (Number(allocation.quantity || 0) + Number(allocation.quantity_issued || 0)));
     const remaining = Math.max(0, total - Number(allocation.quantity_issued || 0) - Number(allocation.quantity_held || 0) - Number(allocation.quantity_in_baskets || 0));
     if (remaining < children.length) throw new Error("There are only " + Math.max(0, remaining) + " tickets remaining for that session.");
