@@ -34,12 +34,11 @@ function renderBoxOfficeCalendar(){
  const firstWeekday=(monthStart.getDay()+6)%7;
  const byDate={};
  boxOfficeEvents.forEach(event=>{
-  const key=boxOfficeDateKey(event.start),bucket=byDate[key]||(byDate[key]={events:[],total:0,remaining:0});
+  const key=boxOfficeDateKey(event.start),bucket=byDate[key]||(byDate[key]={events:[],remaining:0,availableSessions:0});
   bucket.events.push(event);
-  (event.ticket_types||[]).forEach(ticket=>{
-   const total=Math.max(0,Number(ticket.quantity_total)||0),remaining=Math.max(0,Math.min(total,Number(ticket.remaining)||0));
-   bucket.total+=total;bucket.remaining+=remaining;
-  });
+  const sessionRemaining=(event.ticket_types||[]).reduce((sum,ticket)=>sum+Math.max(0,Number(ticket.remaining)||0),0);
+  bucket.remaining+=sessionRemaining;
+  if(sessionRemaining>0)bucket.availableSessions++;
  });
  const weekdayNames=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
  let html='<div class="calendar-heading"><button type="button" class="secondary calendar-nav" id="bo-calendar-prev" '+(calendarMonth===calendarMonthRange[0]?'disabled':'')+'>‹</button><strong>'+monthStart.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</strong><button type="button" class="secondary calendar-nav" id="bo-calendar-next" '+(calendarMonth===calendarMonthRange[calendarMonthRange.length-1]?'disabled':'')+'>›</button></div>';
@@ -48,10 +47,11 @@ function renderBoxOfficeCalendar(){
  for(let day=1;day<=daysInMonth;day++){
   const key=year+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0"),bucket=byDate[key];
   if(!bucket){html+='<span class="calendar-day empty"><strong>'+day+'</strong></span>';continue}
-  const sold=bucket.total-bucket.remaining,rate=bucket.total>0?sold/bucket.total:0;
-  const level=bucket.remaining===0?"soldout":rate>=.8?"busy":rate>=.5?"filling":"quiet";
-  const label=bucket.remaining>0?bucket.remaining+" places left":"Sold out";
-  html+='<button type="button" class="calendar-day '+level+'" data-calendar-date="'+key+'" '+(bucket.remaining>0?'':'disabled')+'><strong>'+day+'</strong><span>'+bucket.events.length+' '+(bucket.events.length===1?'session':'sessions')+'</span><span>'+label+'</span></button>';
+  const availableSessions=bucket.availableSessions;
+  const level=availableSessions===0?"soldout":availableSessions<=2?"busy":availableSessions<=4?"filling":"quiet";
+  const sessionLabel=availableSessions+" of "+bucket.events.length+" "+(bucket.events.length===1?"session":"sessions")+" available";
+  const placesLabel=bucket.remaining>0?bucket.remaining+" places left":"Sold out";
+  html+='<button type="button" class="calendar-day '+level+'" data-calendar-date="'+key+'" '+(bucket.remaining>0?'':'disabled')+'><strong>'+day+'</strong><span>'+sessionLabel+'</span><span>'+placesLabel+'</span></button>';
  }
  html+='</div><div class="calendar-legend"><span><i class="quiet"></i> Quiet</span><span><i class="filling"></i> Filling</span><span><i class="busy"></i> Nearly full</span><span><i class="soldout"></i> Sold out</span><span><i class="empty"></i> No sessions</span></div>';
  host.innerHTML=html;
