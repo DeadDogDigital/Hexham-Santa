@@ -13,7 +13,58 @@ async function loadAuth(){
  await loadBoxOfficeEvents();
 }
 let boxOfficeEvents = [];
+let calendarMonth = null;
+let calendarMonthRange = [];
 let currentBoxOfficeAttemptId = null;
+
+function boxOfficeDateKey(value){
+ return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));
+}
+function monthKey(date){return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")}
+function renderBoxOfficeCalendar(){
+ const host=$("#bo-date-overview");if(!host)return;
+ if(!boxOfficeEvents.length){host.innerHTML='<p class="calendar-empty">No upcoming published sessions are available.</p>';return}
+ const keys=boxOfficeEvents.map(e=>boxOfficeDateKey(e.start)).sort();
+ const first=new Date(keys[0]+"T12:00:00"),last=new Date(keys[keys.length-1]+"T12:00:00");
+ const minMonth=new Date(first.getFullYear(),first.getMonth(),1),maxMonth=new Date(last.getFullYear(),last.getMonth(),1);
+ calendarMonthRange=[];for(let d=new Date(minMonth);d<=maxMonth;d.setMonth(d.getMonth()+1))calendarMonthRange.push(monthKey(d));
+ if(!calendarMonth||!calendarMonthRange.includes(calendarMonth))calendarMonth=monthKey(new Date());
+ if(!calendarMonthRange.includes(calendarMonth))calendarMonth=calendarMonthRange[0];
+ const [year,month]=calendarMonth.split("-").map(Number),monthStart=new Date(year,month-1,1),daysInMonth=new Date(year,month,0).getDate();
+ const firstWeekday=(monthStart.getDay()+6)%7;
+ const byDate={};
+ boxOfficeEvents.forEach(event=>{
+  const key=boxOfficeDateKey(event.start),bucket=byDate[key]||(byDate[key]={events:[],total:0,remaining:0});
+  bucket.events.push(event);
+  (event.ticket_types||[]).forEach(ticket=>{
+   const total=Math.max(0,Number(ticket.quantity_total)||0),remaining=Math.max(0,Math.min(total,Number(ticket.remaining)||0));
+   bucket.total+=total;bucket.remaining+=remaining;
+  });
+ });
+ const weekdayNames=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+ let html='<div class="calendar-heading"><button type="button" class="secondary calendar-nav" id="bo-calendar-prev" '+(calendarMonth===calendarMonthRange[0]?'disabled':'')+'>‹</button><strong>'+monthStart.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</strong><button type="button" class="secondary calendar-nav" id="bo-calendar-next" '+(calendarMonth===calendarMonthRange[calendarMonthRange.length-1]?'disabled':'')+'>›</button></div>';
+ html+='<div class="calendar-grid calendar-weekdays">'+weekdayNames.map(d=>'<span>'+d+'</span>').join("")+'</div><div class="calendar-grid">';
+ for(let i=0;i<firstWeekday;i++)html+='<span class="calendar-blank"></span>';
+ for(let day=1;day<=daysInMonth;day++){
+  const key=year+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0"),bucket=byDate[key];
+  if(!bucket){html+='<span class="calendar-day empty"><strong>'+day+'</strong></span>';continue}
+  const sold=bucket.total-bucket.remaining,rate=bucket.total>0?sold/bucket.total:0;
+  const level=bucket.remaining===0?"soldout":rate>=.8?"busy":rate>=.5?"filling":"quiet";
+  const label=bucket.remaining>0?bucket.remaining+" places left":"Sold out";
+  html+='<button type="button" class="calendar-day '+level+'" data-calendar-date="'+key+'" '+(bucket.remaining>0?'':'disabled')+'><strong>'+day+'</strong><span>'+bucket.events.length+' '+(bucket.events.length===1?'session':'sessions')+'</span><span>'+label+'</span></button>';
+ }
+ html+='</div><div class="calendar-legend"><span><i class="quiet"></i> Quiet</span><span><i class="filling"></i> Filling</span><span><i class="busy"></i> Nearly full</span><span><i class="soldout"></i> Sold out</span><span><i class="empty"></i> No sessions</span></div>';
+ host.innerHTML=html;
+ $("#bo-calendar-prev")?.addEventListener("click",()=>{const i=calendarMonthRange.indexOf(calendarMonth);if(i>0){calendarMonth=calendarMonthRange[i-1];renderBoxOfficeCalendar()}});
+ $("#bo-calendar-next")?.addEventListener("click",()=>{const i=calendarMonthRange.indexOf(calendarMonth);if(i<calendarMonthRange.length-1){calendarMonth=calendarMonthRange[i+1];renderBoxOfficeCalendar()}});
+ host.querySelectorAll("[data-calendar-date]").forEach(button=>button.addEventListener("click",()=>selectBoxOfficeDate(button.dataset.calendarDate)));
+}
+function selectBoxOfficeDate(date){
+ const dateSelect=$("#bo-date");if(!dateSelect)return;
+ if(![...dateSelect.options].some(option=>option.value===date))return;
+ dateSelect.value=date;dateSelect.dispatchEvent(new Event("change"));
+ dateSelect.scrollIntoView({behavior:"smooth",block:"center"});
+}
 function boxOfficeMessage(text, isError=false){
  const el=$("#bo-message"); if(!el)return;
  el.textContent=text; el.classList.remove("hidden");
@@ -39,9 +90,11 @@ async function loadBoxOfficeEvents(){
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"Could not load sessions.");
   const now=Date.now();
-  boxOfficeEvents=(data.events||[]).map(event=>({...event,ticket_types:(event.ticket_types||[]).filter(ticket=>ticket.status==="on_sale"&&Number(ticket.remaining)>0)})).filter(event=>Number.isFinite(Date.parse(event.start||""))&&Date.parse(event.start)>now&&!event.unavailable&&event.ticket_types.length>0).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+  boxOfficeEvents=(data.events||[]).map(event=>({...event,ticket_types:(event.ticket_types||[]).filter(ticket=>ticket.status==="on_sale")})).filter(event=>Number.isFinite(Date.parse(event.start||""))&&Date.parse(event.start)>now&&!event.unavailable&&event.ticket_types.length>0).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+  renderBoxOfficeCalendar();
   const dateSelect=$("#bo-date");
-  const dates=[...new Set(boxOfficeEvents.map(e=>new Date(e.start).toLocaleDateString("en-CA",{timeZone:"Europe/London"})))];
+  const bookableEvents=boxOfficeEvents.filter(event=>event.ticket_types.some(ticket=>Number(ticket.remaining)>0));
+  const dates=[...new Set(bookableEvents.map(e=>boxOfficeDateKey(e.start)))];
   dateSelect.innerHTML=dates.length?'<option value="">Choose an available date</option>'+dates.map(date=>'<option value="'+date+'">'+new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Europe/London"})+'</option>').join(""):'<option value="">No future dates with available tickets</option>';
   select.innerHTML='<option value="">Choose a date first</option>';
   select.disabled=true;
@@ -124,7 +177,7 @@ $("#signup").onclick=async()=>{const email=$("#email").value.trim(),password=$("
 $("#login").onclick=async()=>{const button=$("#login"),email=$("#email").value.trim(),password=$("#password").value;if(!email||!password)return message("Enter your email address and password.");button.disabled=true;button.textContent="Signing in…";$("#msg").classList.add("hidden");try{const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;if(!data?.user)throw new Error("Supabase did not return a signed-in user.");await loadAuth();}catch(error){message(error?.message||"Sign-in failed. Please try again.");}finally{button.disabled=false;button.textContent="Sign in";}};
 $("#logout").onclick=async()=>{await sb.auth.signOut();loadAuth();};
 $("#bo-date").addEventListener("change",()=>{
- const date=$("#bo-date").value, sessions=boxOfficeEvents.filter(e=>new Date(e.start).toLocaleDateString("en-CA",{timeZone:"Europe/London"})===date);
+ const date=$("#bo-date").value, sessions=boxOfficeEvents.filter(e=>boxOfficeDateKey(e.start)===date&&e.ticket_types.some(t=>Number(t.remaining)>0));
  const select=$("#bo-event");select.innerHTML=sessions.length?'<option value="">Choose a session</option>'+sessions.map(e=>'<option value="'+esc(e.id)+'">'+esc(new Date(e.start).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}))+' · '+esc(e.name||"Santa session")+'</option>').join(""):'<option value="">No available sessions on this date</option>';
  select.disabled=!sessions.length;$("#bo-ticket").innerHTML='<option value="">Choose a session first</option>';$("#bo-ticket").disabled=true;$("#bo-availability").textContent="Choose a session to see ticket availability.";
 });
