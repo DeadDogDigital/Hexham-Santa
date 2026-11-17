@@ -34,6 +34,7 @@ async function loadBoxOfficeEvents(){
  select.innerHTML='<option value="">Loading sessions…</option>';
  try{
   const {data:{session}}=await sb.auth.getSession();
+  if(!session?.access_token)throw new Error("Your sign-in has expired. Please sign out and sign in again.");
   const response=await fetch("/api/box-office-events",{headers:{Authorization:"Bearer "+session.access_token}});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"Could not load sessions.");
@@ -44,7 +45,7 @@ async function loadBoxOfficeEvents(){
   dateSelect.innerHTML=dates.length?'<option value="">Choose an available date</option>'+dates.map(date=>'<option value="'+date+'">'+new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Europe/London"})+'</option>').join(""):'<option value="">No future dates with available tickets</option>';
   select.innerHTML='<option value="">Choose a date first</option>';
   select.disabled=true;
- }catch(error){select.innerHTML='<option value="">Sessions unavailable</option>';boxOfficeMessage(error.message,true)}
+ }catch(error){select.innerHTML='<option value="">Sessions unavailable</option>';const dateSelect=$("#bo-date");if(dateSelect)dateSelect.innerHTML='<option value="">Could not load dates</option>';boxOfficeMessage(error.message||"Could not load available dates. Please try signing in again.",true)}
 }
 function updateBoxOfficeTicketTypes(){
  const event=boxOfficeEvents.find(e=>e.id===$("#bo-event")?.value), select=$("#bo-ticket"), info=$("#bo-availability");
