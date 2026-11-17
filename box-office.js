@@ -39,7 +39,7 @@ async function loadBoxOfficeEvents(){
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"Could not load sessions.");
   const now=Date.now();
-  boxOfficeEvents=(data.events||[]).map(event=>({...event,ticket_types:(event.ticket_types||[]).filter(ticket=>["on_sale","admin_only"].includes(ticket.status)&&Number(ticket.remaining)>0)})).filter(event=>Number.isFinite(Date.parse(event.start||""))&&Date.parse(event.start)>now&&!event.unavailable&&event.ticket_types.length>0).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+  boxOfficeEvents=(data.events||[]).map(event=>({...event,ticket_types:(event.ticket_types||[]).filter(ticket=>ticket.status==="on_sale"&&Number(ticket.remaining)>0)})).filter(event=>Number.isFinite(Date.parse(event.start||""))&&Date.parse(event.start)>now&&!event.unavailable&&event.ticket_types.length>0).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
   const dateSelect=$("#bo-date");
   const dates=[...new Set(boxOfficeEvents.map(e=>new Date(e.start).toLocaleDateString("en-CA",{timeZone:"Europe/London"})))];
   dateSelect.innerHTML=dates.length?'<option value="">Choose an available date</option>'+dates.map(date=>'<option value="'+date+'">'+new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Europe/London"})+'</option>').join(""):'<option value="">No future dates with available tickets</option>';
