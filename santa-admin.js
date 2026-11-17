@@ -326,7 +326,11 @@ async function submitBoxOfficeBooking(){
   })});
   const result=await response.json();
   if(!response.ok||!result.ok){
-   boxOfficeMessage(result.message||result.error||"Booking could not be completed. "+(result.recovery_required?"The issued tickets need recovery. Do not sell them again.":""),true);
+   if(result.recovery_required){
+    currentBoxOfficeAttemptId=result.attempt_id||currentBoxOfficeAttemptId;
+    $("#bo-recover").classList.remove("hidden");
+   }
+   boxOfficeMessage(result.message||result.error||"Booking could not be completed. Do not submit this sale again until it has been reconciled.",true);
    return;
   }
   currentBoxOfficeAttemptId=null;$("#bo-recover").classList.add("hidden");
@@ -350,6 +354,7 @@ async function recoverBoxOfficeAttempt(){
    boxOfficeMessage("Recovery complete. The existing tickets have been reconciled and the booking is now in the dashboard.");
    await load();
   }else{
+   if(result.recovery_required)button.classList.remove("hidden");
    boxOfficeMessage(result.message||result.error||"Recovery is still required. Do not submit this sale again.",true);
   }
  }catch(error){boxOfficeMessage(error.message||"Could not reconcile this attempt. Do not submit it again.",true)}
