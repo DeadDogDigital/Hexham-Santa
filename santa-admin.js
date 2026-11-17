@@ -284,8 +284,9 @@ async function loadBoxOfficeEvents(){
   const response=await fetch("/api/box-office-events",{headers:{Authorization:"Bearer "+session.access_token}});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"Could not load sessions.");
-  boxOfficeEvents=data.events||[];
-  select.innerHTML='<option value="">Choose a session</option>'+boxOfficeEvents.map(e=>'<option value="'+esc(e.id)+'">'+esc(formatDateTime(e.start))+' · '+esc(e.name||"Santa session")+'</option>').join("");
+  const now=Date.now();
+  boxOfficeEvents=(data.events||[]).map(event=>({...event,ticket_types:(event.ticket_types||[]).filter(ticket=>["on_sale","admin_only"].includes(ticket.status)&&Number(ticket.remaining)>0)})).filter(event=>Number.isFinite(Date.parse(event.start||""))&&Date.parse(event.start)>now&&!event.unavailable&&event.ticket_types.length>0).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+  select.innerHTML=boxOfficeEvents.length?'<option value="">Choose an available future session</option>'+boxOfficeEvents.map(e=>'<option value="'+esc(e.id)+'">'+esc(formatDateTime(e.start))+' · '+esc(e.name||"Santa session")+'</option>').join(""):'<option value="">No future sessions with available tickets</option>';
  }catch(error){select.innerHTML='<option value="">Sessions unavailable</option>';boxOfficeMessage(error.message,true)}
 }
 function updateBoxOfficeTicketTypes(){
