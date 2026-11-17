@@ -65,10 +65,11 @@ async function events() {
         Number(ticket.quantity_held || 0) - Number(ticket.quantity_in_baskets || 0));
       return {
         id: ticket.id, name: ticket.name, price: ticket.price, currency: event.currency || "gbp",
-        status: ticket.status, quantity: ticket.quantity, quantity_held: ticket.quantity_held,
+        status: ticket.status, quantity: ticket.quantity, quantity_total: total,
+        quantity_held: ticket.quantity_held, quantity_in_baskets: ticket.quantity_in_baskets,
         quantity_issued: ticket.quantity_issued, remaining
       };
-    }).filter(ticket => ticket.status === "on_sale" && ticket.remaining > 0);
+    }).filter(ticket => ticket.status === "on_sale");
 
     return {
       id: event.id,
