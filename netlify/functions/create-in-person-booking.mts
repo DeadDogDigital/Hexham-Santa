@@ -41,6 +41,24 @@ async function tt(path, options = {}) {
   return data;
 }
 
+async function sendChildDetailsEmail(bookingId, visitStartsAt, authorization) {
+  const rawToken = crypto.randomBytes(32).toString("base64url");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiry = new Date(new Date(visitStartsAt).getTime() - 36 * 60 * 60 * 1000).toISOString();
+  await db("santa_booking_update_tokens", {
+    method: "POST",
+    body: JSON.stringify({ booking_id: bookingId, token_hash: tokenHash, expires_at: expiry })
+  });
+  const response = await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: authorization || "", apikey: SUPABASE_ANON_KEY },
+    body: JSON.stringify({ booking_id: bookingId, token: rawToken })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) throw new Error(result.error || "The parent details email could not be sent.");
+  return true;
+}
+
 async function provisionBooklet(bookingId, surname) {
   const secret = Netlify.env.get("SANTA_TREATS_PROVISION_SECRET");
   if (!secret) throw new Error("Santa Treats provisioning secret is not configured.");
@@ -162,18 +180,16 @@ export default async request => {
 
     if (detailsMode === "email") {
       try {
-        const rawToken = crypto.randomBytes(32).toString("base64url");
-        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-        const expiry = new Date(new Date(payload.visit_starts_at).getTime() - 36 * 60 * 60 * 1000).toISOString();
-        await db("santa_booking_update_tokens", { method: "POST", body: JSON.stringify({ booking_id: bookingRow.id, token_hash: tokenHash, expires_at: expiry }) });
-        const tokenResponse = await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request", { method: "POST", headers: { "content-type": "application/json", Authorization: request.headers.get("authorization") || "", apikey: SUPABASE_ANON_KEY }, body: JSON.stringify({ booking_id: bookingRow.id, token: rawToken }) });
-        if (tokenResponse.ok) {
-          await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "sent", child_info_request_sent_at: new Date().toISOString() }) });
-        } else {
-          await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed" }) });
-        }
+        await sendChildDetailsEmail(bookingRow.id, payload.visit_starts_at, request.headers.get("authorization") || "");
       } catch (error) {
-        await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), { method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed" }) });
+        const message = error.message || "The parent details email could not be sent.";
+        await db("santa_bookings?id=eq." + encodeURIComponent(bookingRow.id), {
+          method: "PATCH", body: JSON.stringify({ child_info_request_status: "failed", updated_at: new Date().toISOString() })
+        });
+        await db("santa_box_office_attempts?idempotency_key=eq." + encodeURIComponent(attemptId), {
+          method: "PATCH", body: JSON.stringify({ status: "recovery_required", booking_id: bookingRow.id, error_message: message, updated_at: new Date().toISOString() })
+        });
+        return json({ ok: false, recovery_required: true, email_failed: true, booking_id: bookingRow.id, message: "The tickets and booking are saved, but the parent details email was not sent. Use recovery to retry it. Do not create this booking again." }, 202);
       }
     }
 
