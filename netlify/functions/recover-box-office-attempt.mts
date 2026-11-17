@@ -78,16 +78,19 @@ export default async req=>{
   const savedTicketIds=new Set(childRows.map(row=>row.ticket_tailor_ticket_id).filter(Boolean));
   const missingChildren=p.children.map((child,i)=>({child,ticket:issued[i]})).filter(({ticket})=>!savedTicketIds.has(ticket.id));
   if(missingChildren.length)await db("santa_children",{method:"POST",body:JSON.stringify(missingChildren.map(({child,ticket})=>({booking_id:bookingId,ticket_tailor_ticket_id:ticket.id,preferred_name:child.preferred_name,age:child.age,interests:child.interests||null,santa_notes:child.santa_notes||null})))});
-  await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({ticket_tailor_issued_ticket_ids:issued.map(t=>t.id),provisioning_status:"booklet_pending",provisioning_error:null,updated_at:new Date().toISOString()})});
-  await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({booking_id:bookingId,status:"booklet_pending",issued_tickets:issued,updated_at:new Date().toISOString()})});
-  try{await provision(bookingId,p.parent.last_name)}catch(e){
-   await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({provisioning_status:"recovery_required",provisioning_error:e.message,updated_at:new Date().toISOString()})});
-   await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({status:"recovery_required",error_message:e.message,booking_id:bookingId,updated_at:new Date().toISOString()})});
-   return json({ok:false,recovery_required:true,booking_id:bookingId,message:"Tickets and booking are saved, but booklet provisioning still needs attention."},202);
+  const bookingRows=await db("santa_bookings?select=visit_starts_at,child_info_request_status,treat_booklet_id,provisioning_status&id=eq."+encodeURIComponent(bookingId)+"&limit=1");
+  const booking=bookingRows[0];
+  const bookletReady=Boolean(booking?.treat_booklet_id)&&booking?.provisioning_status==="complete";
+  if(!bookletReady){
+   await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({ticket_tailor_issued_ticket_ids:issued.map(t=>t.id),provisioning_status:"booklet_pending",provisioning_error:null,updated_at:new Date().toISOString()})});
+   await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({booking_id:bookingId,status:"booklet_pending",issued_tickets:issued,updated_at:new Date().toISOString()})});
+   try{await provision(bookingId,p.parent.last_name)}catch(e){
+    await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({provisioning_status:"recovery_required",provisioning_error:e.message,updated_at:new Date().toISOString()})});
+    await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({status:"recovery_required",error_message:e.message,booking_id:bookingId,updated_at:new Date().toISOString()})});
+    return json({ok:false,recovery_required:true,booking_id:bookingId,message:"Tickets and booking are saved, but booklet provisioning still needs attention."},202);
+   }
   }
   if(p.child_details_mode==="email"){
-   const bookingRows=await db("santa_bookings?select=visit_starts_at,child_info_request_status&id=eq."+encodeURIComponent(bookingId)+"&limit=1");
-   const booking=bookingRows[0];
    if(booking&&booking.child_info_request_status!=="sent"){
     try{
      await resendChildDetailsEmail(bookingId,booking.visit_starts_at,req.headers.get("authorization")||"");
