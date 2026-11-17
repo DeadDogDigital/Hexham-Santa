@@ -15,7 +15,7 @@ async function db(path, options = {}) {
 }
 
 async function requireAdmin(request) {
-  const token = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
   const auth = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token } });
   if (!auth.ok) return null;
