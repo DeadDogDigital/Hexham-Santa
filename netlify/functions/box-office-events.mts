@@ -52,9 +52,13 @@ async function events() {
   const now = Date.now();
   return all.map(event => {
     const start = event.start?.iso || event.start?.date || null;
-    const startTime = start ? Date.parse(start) : NaN;
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const unavailable = event.unavailable === true || event.unavailable === "true" ||
-      event.tickets_available === false || event.tickets_available === "false";
+      event.hidden === true || event.hidden === "true" ||
+      event.status !== "published" ||
+      event.tickets_available === false || event.tickets_available === "false" ||
+      (Number(event.tickets_available_at) > 0 && Number(event.tickets_available_at) > nowSeconds) ||
+      (Number(event.tickets_unavailable_at) > 0 && Number(event.tickets_unavailable_at) <= nowSeconds);
     const ticketTypes = (event.ticket_types || []).map(ticket => {
       const total = Number(ticket.quantity_total ?? (Number(ticket.quantity || 0) + Number(ticket.quantity_issued || 0)));
       const remaining = Math.max(0, total - Number(ticket.quantity_issued || 0) -
@@ -64,7 +68,7 @@ async function events() {
         status: ticket.status, quantity: ticket.quantity, quantity_held: ticket.quantity_held,
         quantity_issued: ticket.quantity_issued, remaining
       };
-    }).filter(ticket => ["on_sale", "admin_only"].includes(ticket.status) && ticket.remaining > 0);
+    }).filter(ticket => ticket.status === "on_sale" && ticket.remaining > 0);
 
     return {
       id: event.id,
