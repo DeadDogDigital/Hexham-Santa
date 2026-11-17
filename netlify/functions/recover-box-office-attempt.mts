@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 const SUPABASE_URL = "https://atqhqizzfnsokulmupmy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_-TvnUkpHRB9jkkNqJQAXCA_tkaAeY7_";
 const json = (body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json","cache-control":"no-store"}});
@@ -23,6 +24,18 @@ async function provision(bookingId,surname){
  const r=await fetch("https://giftlocal.netlify.app/api/provision-treats-booklet",{method:"POST",headers:{"content-type":"application/json","x-santa-provision-secret":secret},body:JSON.stringify({booking_ref:bookingId,family_surname:surname||""})});
  const d=await r.json().catch(()=>({}));if(!r.ok||!d.access_token)throw new Error(d.error||"Treats booklet provisioning failed.");
  await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({treat_booklet_id:d.access_token,provisioning_status:"complete",provisioning_error:null,updated_at:new Date().toISOString()})});
+}
+async function resendChildDetailsEmail(bookingId, visitStartsAt, authorization) {
+ const rawToken=crypto.randomBytes(32).toString("base64url");
+ const digest=crypto.createHash("sha256").update(rawToken).digest("hex");
+ const expiresAt=new Date(new Date(visitStartsAt).getTime()-36*60*60*1000).toISOString();
+ await db("santa_booking_update_tokens",{method:"POST",body:JSON.stringify({booking_id:bookingId,token_hash:digest,expires_at:expiresAt})});
+ const r=await fetch("https://atqhqizzfnsokulmupmy.supabase.co/functions/v1/send-child-info-request",{
+  method:"POST",headers:{"content-type":"application/json",Authorization:authorization||"",apikey:SUPABASE_ANON_KEY},
+  body:JSON.stringify({booking_id:bookingId,token:rawToken})
+ });
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok||!d.ok)throw new Error(d.error||"The parent details email could not be sent.");
 }
 export default async req=>{
  if(req.method!=="POST")return json({error:"Method not allowed"},405);
@@ -71,6 +84,19 @@ export default async req=>{
    await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({provisioning_status:"recovery_required",provisioning_error:e.message,updated_at:new Date().toISOString()})});
    await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({status:"recovery_required",error_message:e.message,booking_id:bookingId,updated_at:new Date().toISOString()})});
    return json({ok:false,recovery_required:true,booking_id:bookingId,message:"Tickets and booking are saved, but booklet provisioning still needs attention."},202);
+  }
+  if(p.child_details_mode==="email"){
+   const bookingRows=await db("santa_bookings?select=visit_starts_at,child_info_request_status&id=eq."+encodeURIComponent(bookingId)+"&limit=1");
+   const booking=bookingRows[0];
+   if(booking&&booking.child_info_request_status!=="sent"){
+    try{
+     await resendChildDetailsEmail(bookingId,booking.visit_starts_at,req.headers.get("authorization")||"");
+    }catch(e){
+     await db("santa_bookings?id=eq."+encodeURIComponent(bookingId),{method:"PATCH",body:JSON.stringify({child_info_request_status:"failed",updated_at:new Date().toISOString()})});
+     await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({status:"recovery_required",booking_id:bookingId,error_message:e.message,updated_at:new Date().toISOString()})});
+     return json({ok:false,recovery_required:true,email_failed:true,booking_id:bookingId,message:"The booking and tickets are safe, but the parent details email still could not be sent. You can retry recovery. Do not create another booking."},202);
+    }
+   }
   }
   await db("santa_box_office_attempts?idempotency_key=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({status:"complete",booking_id:bookingId,issued_tickets:issued,error_message:null,updated_at:new Date().toISOString()})});
   return json({ok:true,complete:true,booking_id:bookingId,issued_tickets:issued});
