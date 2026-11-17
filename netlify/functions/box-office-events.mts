@@ -15,7 +15,7 @@ async function db(path, options = {}) {
 }
 
 async function requireAdmin(request) {
-  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
   if (!token) return null;
   const auth = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token } });
   if (!auth.ok) return null;
@@ -48,21 +48,40 @@ async function events() {
     cursor = batch[batch.length - 1]?.id;
     if (!cursor) break;
   }
-  return all.map(event => ({
-    id: event.id,
-    event_series_id: event.event_series_id,
-    name: event.name,
-    start: event.start?.iso || event.start?.date || null,
-    end: event.end?.iso || event.end?.date || null,
-    timezone: event.timezone || "Europe/London",
-    unavailable: event.unavailable === "true" || event.tickets_available === "false",
-    ticket_types: (event.ticket_types || []).map(ticket => ({
-      id: ticket.id, name: ticket.name, price: ticket.price, currency: event.currency || "gbp",
-      status: ticket.status, quantity: ticket.quantity, quantity_held: ticket.quantity_held,
-      quantity_issued: ticket.quantity_issued,
-      remaining: Math.max(0, Number(ticket.quantity_total ?? (Number(ticket.quantity || 0) + Number(ticket.quantity_issued || 0))) - Number(ticket.quantity_issued || 0) - Number(ticket.quantity_held || 0) - Number(ticket.quantity_in_baskets || 0))
-    })).filter(ticket => ["on_sale", "admin_only"].includes(ticket.status))
-  }));
+
+  const now = Date.now();
+  return all.map(event => {
+    const start = event.start?.iso || event.start?.date || null;
+    const startTime = start ? Date.parse(start) : NaN;
+    const unavailable = event.unavailable === true || event.unavailable === "true" ||
+      event.tickets_available === false || event.tickets_available === "false";
+    const ticketTypes = (event.ticket_types || []).map(ticket => {
+      const total = Number(ticket.quantity_total ?? (Number(ticket.quantity || 0) + Number(ticket.quantity_issued || 0)));
+      const remaining = Math.max(0, total - Number(ticket.quantity_issued || 0) -
+        Number(ticket.quantity_held || 0) - Number(ticket.quantity_in_baskets || 0));
+      return {
+        id: ticket.id, name: ticket.name, price: ticket.price, currency: event.currency || "gbp",
+        status: ticket.status, quantity: ticket.quantity, quantity_held: ticket.quantity_held,
+        quantity_issued: ticket.quantity_issued, remaining
+      };
+    }).filter(ticket => ["on_sale", "admin_only"].includes(ticket.status) && ticket.remaining > 0);
+
+    return {
+      id: event.id,
+      event_series_id: event.event_series_id,
+      name: event.name,
+      start,
+      end: event.end?.iso || event.end?.date || null,
+      timezone: event.timezone || "Europe/London",
+      unavailable,
+      ticket_types: ticketTypes
+    };
+  }).filter(event =>
+    Number.isFinite(Date.parse(event.start || "")) &&
+    Date.parse(event.start) > now &&
+    !event.unavailable &&
+    event.ticket_types.length > 0
+  ).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
 }
 
 export default async request => {
