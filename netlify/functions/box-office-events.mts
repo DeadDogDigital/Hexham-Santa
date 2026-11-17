@@ -60,9 +60,10 @@ async function events() {
       (Number(event.tickets_available_at) > 0 && Number(event.tickets_available_at) > nowSeconds) ||
       (Number(event.tickets_unavailable_at) > 0 && Number(event.tickets_unavailable_at) <= nowSeconds);
     const ticketTypes = (event.ticket_types || []).map(ticket => {
-      const total = Number(ticket.quantity_total ?? (Number(ticket.quantity || 0) + Number(ticket.quantity_issued || 0)));
-      const remaining = Math.max(0, total - Number(ticket.quantity_issued || 0) -
-        Number(ticket.quantity_held || 0) - Number(ticket.quantity_in_baskets || 0));
+      const total = Math.max(0, Number(ticket.quantity_total) || 0);
+      // Ticket Tailor's quantity field is already the number available for purchase.
+      // Do not subtract issued, held or basket quantities again.
+      const remaining = Math.max(0, Number(ticket.quantity) || 0);
       return {
         id: ticket.id, name: ticket.name, price: ticket.price, currency: event.currency || "gbp",
         status: ticket.status, quantity: ticket.quantity, quantity_total: total,
