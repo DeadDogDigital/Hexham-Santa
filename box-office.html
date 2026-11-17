@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hexham Santa · In-person Box Office</title>
+<style>
+body{margin:0;background:#0f1f1a;color:#f5ead6;font:18px/1.5 Georgia,serif}.wrap{max-width:900px;margin:auto;padding:28px 18px}.card{background:#fdf6e8;color:#1a1208;border-radius:14px;padding:22px;margin:0 0 18px}h1,h2{font-family:Georgia,serif}input,select,textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #d7c7a7;border-radius:8px;margin:5px 0 12px;font:inherit}button{border:0;border-radius:999px;padding:11px 18px;background:#7a1f2e;color:#fff;font-weight:bold;cursor:pointer}.secondary{background:#e8d5b0;color:#1a1208}.row{display:flex;gap:12px}.row>div{flex:1}.muted{opacity:.7}.hidden{display:none!important}.notice{padding:12px;background:#eee3cc;border-radius:8px;margin:12px 0}.nav-link{color:#7a1f2e;font-weight:bold}@media(max-width:650px){.row{display:block}.wrap{padding:16px 12px}.card{padding:17px}}
+</style></head><body><main class="wrap">
+<div class="card"><a class="nav-link" href="/admin.html">← Back to main dashboard</a><p>HEXHAM SANTA · 2026</p><h1>In-person Box Office</h1><p class="muted">Create an in-person booking and issue Ticket Tailor tickets.</p></div>
+<section id="auth" class="card"><h2>Sign in</h2><label>Email</label><input id="email" type="email"><label>Password</label><input id="password" type="password"><button id="login">Sign in</button> <button id="signup" class="secondary">Create account</button><div id="msg" class="notice hidden"></div></section>
+<section id="app" class="hidden">
+<div class="card"><div class="row"><div><strong id="who"></strong><div class="muted">Santa administrator</div></div><div><button id="logout" class="secondary">Sign out</button></div></div></div>
+<div class="card">
+<h2>Choose a visit</h2><label for="bo-date">Available date</label><select id="bo-date"><option value="">Loading available dates…</option></select>
+<label for="bo-event">Session</label><select id="bo-event" disabled><option value="">Choose a date first</option></select>
+<label for="bo-ticket">Ticket type</label><select id="bo-ticket" disabled><option value="">Choose a session first</option></select>
+<div class="notice" id="bo-availability">Choose a date and session to see live ticket availability.</div>
+</div>
+<div class="card">
+<h2>Parent details</h2><div class="row"><div><label for="bo-first">Parent first name</label><input id="bo-first" autocomplete="given-name"></div><div><label for="bo-last">Parent surname</label><input id="bo-last" autocomplete="family-name"></div></div>
+<div class="row"><div><label for="bo-email">Email</label><input id="bo-email" type="email" autocomplete="email"></div><div><label for="bo-phone">Phone</label><input id="bo-phone" autocomplete="tel"></div></div>
+<div class="row"><div><label for="bo-payment">Payment received by</label><select id="bo-payment"><option value="cash">Cash</option><option value="card">Card</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></div><div><label for="bo-count">Number of children</label><select id="bo-count"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+<div class="notice"><label><input id="bo-email-child-details" type="checkbox" style="width:auto"> Email the parent a secure form to complete children’s details later</label><small>Private link expires 36 hours before the visit.</small></div>
+<div id="bo-children"></div><button type="button" id="bo-submit">Create booking and issue tickets</button><div id="bo-message" class="notice hidden" role="status" aria-live="polite"></div><button type="button" id="bo-recover" class="secondary hidden">Reconcile incomplete booking</button>
+</div></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/box-office.js"></script></body></html>
