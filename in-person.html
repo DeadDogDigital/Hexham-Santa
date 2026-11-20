@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1f1a">
+<title>Buy your Hexham Santa tickets here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IM+Fell+English:ital@0;1&family=Crimson+Text:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1a1208;--parchment:#f5ead6;--burgundy:#7a1f2e;--gold:#c49a2a;--gold-light:#e8be50;--midnight:#0f1f1a;--cream:#fdf6e8}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;width:100%;background:var(--midnight);color:var(--parchment)}
+body{font-family:'Crimson Text',Georgia,serif;overflow:hidden}
+.screen{position:relative;min-height:100svh;display:flex;align-items:center;justify-content:center;text-align:center;padding:clamp(20px,5vw,64px);isolation:isolate}
+.backdrop{position:absolute;inset:0;z-index:-2;background-image:url('https://raw.githubusercontent.com/thebigtv/Hexham-santa/main/santa-room-wide.jpeg');background-size:cover;background-position:center 42%;transform:scale(1.025)}
+.screen:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(7,16,12,.70),rgba(7,16,12,.48) 45%,rgba(7,16,12,.86)),radial-gradient(ellipse at center,rgba(196,154,42,.13),transparent 65%)}
+.content{width:min(100%,900px);display:flex;flex-direction:column;align-items:center}
+.eyebrow{font:italic clamp(16px,2vw,23px) 'IM Fell English',serif;letter-spacing:.24em;text-transform:uppercase;color:var(--gold-light)}
+h1{font:900 clamp(48px,10vw,112px)/.98 'Playfair Display',Georgia,serif;color:var(--cream);text-shadow:0 4px 28px #000;margin:16px 0 0}
+h1 em{display:block;color:var(--gold-light);font-size:.78em}
+.rule{height:1px;width:min(300px,55vw);background:linear-gradient(90deg,transparent,var(--gold-light),transparent);margin:clamp(18px,3vh,30px) 0}
+.intro{font:italic clamp(20px,3vw,30px)/1.35 'IM Fell English',serif;max-width:690px;margin:0;color:#fff4df;text-shadow:0 2px 12px #000}
+.prompt{font:700 clamp(23px,4vw,38px) 'Playfair Display',serif;color:var(--cream);margin:clamp(24px,4vh,42px) 0 18px}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:14px;min-height:76px;padding:18px clamp(26px,5vw,56px);background:linear-gradient(135deg,#e8be50,#c49a2a);color:#24190a;text-decoration:none;border:2px solid #f7dc8e;box-shadow:0 8px 28px rgba(0,0,0,.4);font:700 clamp(18px,2.8vw,27px) 'Playfair Display',Georgia,serif;letter-spacing:.025em;transition:transform .18s,filter .18s}
+.cta:focus-visible{outline:4px solid white;outline-offset:5px}.cta:active{transform:scale(.98)}
+.dates{font:italic clamp(17px,2vw,22px) 'IM Fell English',serif;color:var(--gold-light);letter-spacing:.12em;margin-top:clamp(22px,4vh,38px)}
+.footer{font:14px 'Crimson Text',serif;color:rgba(255,244,223,.78);margin-top:18px}
+.snow{position:absolute;inset:0;pointer-events:none;z-index:-1;opacity:.65;background-image:radial-gradient(2px 2px at 12% 18%,#fff 98%,transparent),radial-gradient(2px 2px at 78% 22%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 33% 72%,#fff 98%,transparent),radial-gradient(2px 2px at 90% 82%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 58% 48%,#fff 98%,transparent)}
+@media(max-height:600px){.screen{padding:16px}.eyebrow{font-size:14px}h1{font-size:clamp(42px,9vh,68px)}.rule{margin:12px 0}.intro{font-size:19px}.prompt{margin:14px 0 10px;font-size:22px}.cta{min-height:58px;padding:12px 28px;font-size:19px}.dates{margin-top:14px}.footer{margin-top:8px}}
+</style>
+</head>
+<body>
+<main class="screen">
+<div class="backdrop" aria-hidden="true"></div><div class="snow" aria-hidden="true"></div>
+<div class="content">
+<div class="eyebrow">A magical Christmas experience in Hexham</div>
+<h1>HEXHAM <em>SANTA</em></h1>
+<div class="rule"></div>
+<p class="intro">Step inside the Old Gaol and discover the magic of a Dickensian Christmas. Meet Father Christmas and make a little Christmas memory to treasure.</p>
+<div class="prompt">Buying your tickets in person?</div>
+<a class="cta" href="/box-office.html">Continue to ticket sales <span aria-hidden="true">→</span></a>
+<div class="dates">25 November – 24 December 2026</div>
+<div class="footer">Hexham Old Gaol · Hexham Christmas</div>
+</div>
+</main>
+</body>
+</html>
