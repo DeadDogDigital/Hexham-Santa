@@ -446,3 +446,60 @@ $("#bo-event")?.addEventListener("change",updateBoxOfficeTicketTypes);
 $("#bo-submit")?.addEventListener("click",submitBoxOfficeBooking);
 $("#bo-recover")?.addEventListener("click",recoverBoxOfficeAttempt);
 renderBoxOfficeChildren();
+
+/* Session Print Pack: independent of the existing selected-group briefing. */
+function sessionPackGroups(dateValue){
+  if(!dateValue)return [];
+  const rows=allBookings.filter(b=>b.visit_starts_at&&dateKey(b.visit_starts_at)===dateValue&&!isCancelled(b));
+  const groups=new Map();
+  for(const booking of rows){
+    const start=new Date(booking.visit_starts_at);
+    const key=String(start.getTime());
+    if(!groups.has(key))groups.set(key,{start,bookings:[],type:isGroupBooking(booking)?"GROUP":"PRIVATE"});
+    const group=groups.get(key);
+    group.bookings.push(booking);
+    if(group.type!==(isGroupBooking(booking)?"GROUP":"PRIVATE"))group.type="MIXED";
+  }
+  return [...groups.values()].sort((a,b)=>a.start-b.start);
+}
+function renderSessionPackList(){
+  const date=$("#session-pack-date")?.value;
+  const host=$("#session-pack-list"),status=$("#session-pack-status");
+  if(!host||!status)return;
+  const groups=sessionPackGroups(date);
+  host.innerHTML=groups.map((g,i)=>{
+    const childCount=g.bookings.reduce((n,b)=>n+(b.santa_children||[]).length,0);
+    return '<div class="session-pack-item"><strong>'+esc(g.start.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}))+' · '+esc(g.type)+'</strong><span>'+g.bookings.length+' families · '+childCount+' children</span><br><button type="button" data-print-session="'+i+'">Print this session</button></div>';
+  }).join("")||'<p>No confirmed sessions found for this date.</p>';
+  status.textContent=groups.length?groups.length+" session(s) ready to print.":"";
+  $$("[data-print-session]").forEach(btn=>btn.onclick=()=>printSessionPack(date,Number(btn.dataset.printSession)));
+}
+function sessionSheetHtml(group,index,total,date){
+  const families=group.bookings.map((b,bi)=>{
+    const parent=((b.parent_first_name||"")+" "+(b.parent_last_name||"")).trim()||"Family name not provided";
+    const kids=(b.santa_children||[]).map(c=>{
+      const photo=c.photo_url?'<img class="kid-photo" src="'+esc(c.photo_url)+'" alt="">':'';
+      return '<div class="kid">'+photo+'<div class="kid-info"><div class="kid-name">'+esc(c.preferred_name||"Name not provided")+(c.age!=null?' <span>Age '+esc(c.age)+'</span>':"")+'</div><div><b>Loves:</b> '+esc(c.interests||"Not provided")+'</div><div><b>Santa notes:</b> '+esc(c.santa_notes||"Nothing noted")+'</div></div></div>';
+    }).join("");
+    return '<section class="family"><h3>'+esc(parent)+'</h3>'+ (kids||'<p>No child details recorded.</p>') +'</section>';
+  }).join("");
+  const children=group.bookings.reduce((n,b)=>n+(b.santa_children||[]).length,0);
+  return '<article class="session-sheet"><div class="trim-area"><div class="sheet-content"><header class="sheet-head"><div class="sheet-brand">HEXHAM SANTA EXPERIENCE</div><div class="sheet-date">'+esc(new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}))+'</div><div class="sheet-time">'+esc(group.start.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}))+'</div><div class="sheet-meta">'+esc(group.type)+' SESSION · '+group.bookings.length+' FAMILIES · '+children+' CHILDREN</div><div class="sheet-counter">SESSION '+(index+1)+' OF '+total+'</div></header><main class="sheet-families">'+families+'</main><footer>PRIVATE STAFF BRIEFING · PLEASE KEEP CONFIDENTIAL</footer></div></div></article>';
+}
+function printSessionPack(dateValue,onlyIndex=null){
+  const groups=sessionPackGroups(dateValue);
+  if(!groups.length){alert("There are no confirmed sessions to print for this date.");return}
+  const selected=onlyIndex===null?groups:[groups[onlyIndex]].filter(Boolean);
+  if(!selected.length)return;
+  const pages=selected.map(g=>sessionSheetHtml(g,groups.indexOf(g),groups.length,dateValue)).join("");
+  const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Santa Session Print Pack</title><style>'+
+  '*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Arial,sans-serif;color:#171717}.actions{padding:12px;background:#fdf6e8;display:flex;gap:10px;position:sticky;top:0;z-index:5}.actions button{border:0;border-radius:20px;padding:10px 16px;background:#7a1f2e;color:#fff;font-weight:bold}.actions .secondary{background:#e8d5b0;color:#1a1208}.session-sheet{width:210mm;height:297mm;position:relative;page-break-after:always;break-after:page;overflow:hidden}.trim-area{position:absolute;width:159mm;height:246mm;left:50%;top:50%;transform:translate(-50%,-50%);border:1px dashed #bbb;padding:4mm;overflow:hidden}.sheet-content{height:100%;overflow:hidden;display:flex;flex-direction:column}.sheet-head{border-bottom:1.2mm solid #7a1f2e;padding-bottom:3mm;margin-bottom:2mm}.sheet-brand{font-size:8pt;letter-spacing:1.5pt;font-weight:bold;color:#7a1f2e}.sheet-date{font-size:15pt;font-weight:bold;margin-top:2mm}.sheet-time{font-size:27pt;line-height:1.05;font-weight:bold;color:#7a1f2e}.sheet-meta{font-size:9pt;font-weight:bold;margin-top:2mm}.sheet-counter{font-size:7.5pt;color:#555;margin-top:1mm}.sheet-families{flex:1;overflow:hidden}.family{border-bottom:.3mm solid #bbb;padding:2mm 0}.family h3{font-size:11pt;margin:0 0 1.5mm;color:#7a1f2e}.kid{display:flex;gap:2.5mm;padding:1mm 0;break-inside:avoid}.kid-photo{width:17mm;height:17mm;object-fit:cover;border-radius:1mm;flex-shrink:0}.kid-info{font-size:7.5pt;line-height:1.25;min-width:0}.kid-name{font-size:9pt;font-weight:bold;margin-bottom:.5mm}.kid-name span{font-size:7.5pt;font-weight:normal;color:#444}.family p{font-size:8pt;margin:1mm 0}.sheet-content footer{font-size:6.5pt;color:#555;border-top:.2mm solid #bbb;padding-top:1.5mm;margin-top:1.5mm}.overflow-warning{margin:12px;padding:12px;background:#f3d8d8;color:#5b1717;border-radius:8px}.overflow-warning button{margin-left:8px}@page{size:A4;margin:0}@media print{.actions,.overflow-warning{display:none!important}.session-sheet{margin:0}.trim-area{border:0}.session-sheet:last-child{page-break-after:auto;break-after:auto}}'+
+  '</style></head><body><div class="actions"><button onclick="window.print()">Print '+(onlyIndex===null?"whole day":"session")+'</button><button class="secondary" onclick="window.close()">Close</button></div>'+pages+'<script>window.addEventListener("load",()=>{const areas=[...document.querySelectorAll(".sheet-content")];const over=areas.map((el,i)=>({i,overflow:el.scrollHeight>el.clientHeight+2})).filter(x=>x.overflow);if(over.length){const box=document.createElement("div");box.className="overflow-warning";box.innerHTML="<b>Layout warning:</b> "+over.length+" session sheet(s) contain more information than fits in the trim area. Nothing has been shrunk or silently removed. Review before printing; reduce photo display or print the affected session separately if needed.";document.body.insertBefore(box,document.body.children[1]);}});</script></body></html>';
+  const preview=window.open("","_blank");
+  if(!preview){alert("Your browser blocked the print preview. Allow pop-ups for the Santa admin page and try again.");return}
+  preview.document.open();preview.document.write(html);preview.document.close();
+}
+
+$("#session-pack-date")?.addEventListener("change",renderSessionPackList);
+$("#session-pack-refresh")?.addEventListener("click",renderSessionPackList);
+$("#session-pack-print-day")?.addEventListener("click",()=>printSessionPack($("#session-pack-date")?.value));
