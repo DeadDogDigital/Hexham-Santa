@@ -10,6 +10,15 @@ body{margin:0;background:#0f1f1a;color:#f5ead6;font:18px/1.5 Georgia,serif}.wrap
 @media(max-width:700px){.group-tools{align-items:stretch}.group-tools button{width:100%}.booking-actions{align-items:flex-start;flex-direction:column}.child-photo-row{align-items:flex-start}}
 @media print{.group-tools,.booking-actions,.photo-actions{display:none!important}.child-photo,.child-photo-placeholder{print-color-adjust:exact}.group-print-card{display:none!important}body.printing-group #app>*{display:none!important}body.printing-group #app>.card:last-child{display:block!important;background:#fff;color:#000;border:0;padding:0;margin:0}body.printing-group #app>.card:last-child>:not(#group-print-sheet){display:none!important}body.printing-group #group-print-sheet{display:block!important;background:#fff;color:#000;border:0;padding:0;margin:0;font:11pt/1.35 Arial,sans-serif}body.printing-group #group-print-sheet h1{font-size:22pt;color:#000}body.printing-group #group-print-sheet .print-child{grid-template-columns:76px 1fr}body.printing-group #group-print-sheet .print-booking{border:1px solid #888;padding:10pt;margin:0 0 10pt}body.printing-group #group-print-sheet .print-child img{width:76px;height:76px;object-fit:cover}}
 
+
+.session-pack-tools{display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:14px;align-items:end;padding:16px;background:#efe2c8;border:1px solid #c49a2a;border-radius:12px;color:#1a1208;margin:16px 0}
+.session-pack-tools label{display:block;font-weight:bold;font-size:.9rem}
+.session-pack-tools button{margin:4px 6px 4px 0}
+.session-pack-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.session-pack-item{background:#fffaf0;border:1px solid #d7c7a7;border-radius:9px;padding:10px;color:#1a1208}
+.session-pack-item strong{display:block}
+.session-pack-warning{background:#f3d8d8;color:#5b1717;padding:10px;border-radius:8px;margin-top:10px}
+@media(max-width:700px){.session-pack-tools{grid-template-columns:1fr}}
 </style></head><body><main class="wrap"><div class="card"><p>HEXHAM SANTA • 2026</p><h1>Santa Admin</h1><p class="muted">Private operational dashboard. This page is separate from the public Santa homepage.</p></div>
 <section id="auth" class="card"><h2>Sign in</h2><label>Email</label><input id="email" type="email"><label>Password</label><input id="password" type="password"><button id="login">Sign in</button> <button id="signup" class="secondary">Create account</button><button type="button" id="forgot-password" class="secondary">Forgot password?</button><div id="msg" class="notice hidden" aria-live="polite"></div></section>
 <section id="app" class="hidden"><div class="card"><div class="row"><div><strong id="who"></strong><div class="muted">Santa administrator</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><a class="nav-link" href="/email-centre.html">✉ Pre-Visit Emails</a><a class="nav-link" href="/whats-on-admin.html">📅 What’s On Manager</a><button id="logout" class="secondary">Sign out</button></div></div></div>
@@ -17,6 +26,15 @@ body{margin:0;background:#0f1f1a;color:#f5ead6;font:18px/1.5 Georgia,serif}.wrap
 <div class="card"><h2>In-person bookings</h2><p class="muted">Create in-person bookings and issue Ticket Tailor tickets.</p><a class="nav-link" href="/box-office.html">Open Box Office →</a></div>
 <div class="card"><div class="admin-tools"><div class="filter-buttons"><button data-filter="next">Next session</button><button data-filter="today">Today</button><button data-filter="tomorrow">Tomorrow</button><button data-filter="all" class="active">All bookings</button></div><div class="date-filter"><label for="date-filter">Choose date</label><input id="date-filter" type="date"></div></div>
 <div class="print-bar"><div><h2 style="display:inline">Bookings <span id="booking-count" class="booking-count"></span></h2><div id="selection-title" class="selection-title muted"></div></div><button id="print" class="secondary">🖨 Print this view</button></div>
+
+<div class="session-pack-tools print-hide" id="session-pack-tools">
+ <div><label for="session-pack-date">Session print pack date</label><input id="session-pack-date" type="date"></div>
+ <div><strong>Santa session sheets</strong><p class="muted" style="margin:4px 0">One sheet per session, including every confirmed family booked into that time.</p>
+ <button type="button" id="session-pack-refresh" class="secondary">Load sessions</button>
+ <button type="button" id="session-pack-print-day">Print whole day</button>
+ <div id="session-pack-list" class="session-pack-list"></div>
+ <div id="session-pack-status" aria-live="polite"></div></div>
+</div>
 <div class="group-tools print-hide" id="group-tools">
   <div class="hint"><strong>Group visit briefing</strong><br>Bookings before 15:00 can be combined into one Santa briefing sheet. Select bookings in advance or as families arrive.</div>
   <button type="button" id="select-all-groups" class="secondary">Select all groups for this date</button>
