@@ -500,28 +500,26 @@ window.addEventListener("load",()=>{
   originals.forEach(original=>{
    const trim=original.querySelector(".trim-area"),head=original.querySelector(".sheet-head"),list=original.querySelector(".sheet-families"),footer=original.querySelector("footer");
    if(!trim||!head||!list||!footer)return;
-   const families=[...list.children];
+   const families=[...list.children].map(node=>({node,height:node.getBoundingClientRect().height+parseFloat(getComputedStyle(node).marginTop||0)+parseFloat(getComputedStyle(node).marginBottom||0)}));
    if(!families.length)return;
    const available=trim.clientHeight-head.offsetHeight-footer.offsetHeight-16;
    const template=original.cloneNode(true);
    const pageLists=[list];
-   let used=0;
+   let anchor=original,used=0;
    list.innerHTML="";
-   families.forEach(family=>{
-    const h=family.getBoundingClientRect().height+parseFloat(getComputedStyle(family).marginTop||0)+parseFloat(getComputedStyle(family).marginBottom||0);
-    let target=pageLists[pageLists.length-1];
-    if(used>0&&used+h>available){
+   families.forEach(item=>{
+    if(used>0&&used+item.height>available){
      const page=template.cloneNode(true);
      const pageList=page.querySelector(".sheet-families");
      pageList.innerHTML="";
      page.querySelector(".sheet-counter").textContent="SESSION CONTINUED";
-     original.parentNode.insertBefore(page,original.parentNode.querySelectorAll(".session-sheet")[0]===original?original.nextSibling:original.nextSibling);
+     anchor.parentNode.insertBefore(page,anchor.nextSibling);
+     anchor=page;
      pageLists.push(pageList);
-     target=pageList;
      used=0;
     }
-    target.appendChild(family);
-    used+=h;
+    pageLists[pageLists.length-1].appendChild(item.node);
+    used+=item.height;
    });
   });
  };
